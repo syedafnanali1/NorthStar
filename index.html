@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>North Star — Goal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+  <!-- Styles: split into base → components → features -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/features.css">
+</head>
+<body>
+
+<!-- ═══════════ SPLASH SCREEN ═══════════ -->
+<div id="splash">
+  <div class="splash-ambient"></div>
+  <div class="splash-stars" id="splash-stars"></div>
+
+  <svg class="splash-logo" viewBox="0 0 44 44" fill="none">
+    <polygon points="22,3 25,15 37,15 27.5,23 31,35 22,28 13,35 16.5,23 7,15 19,15" fill="white" opacity="0.9"/>
+    <circle cx="22" cy="22" r="4" fill="#C4963A"/>
+  </svg>
+
+  <div class="splash-label">North Star</div>
+  <div class="splash-headline">Small actions,<br>extraordinary results.</div>
+  <div class="splash-sub">What 1% daily improvement looks like over time</div>
+
+  <div class="splash-chart-wrap">
+    <canvas id="splash-canvas"></canvas>
+  </div>
+
+  <div class="splash-quote" id="splash-quote"></div>
+  <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+</div>
+
+<!-- ═══════════ MAIN APP ═══════════ -->
+<div class="app" id="main-app" style="opacity:0;transition:opacity 0.7s ease;">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo-mark">
+      <svg viewBox="0 0 36 36" fill="none">
+        <polygon points="18,3 20.5,13 30,13 22.5,19.5 25.5,30 18,23.5 10.5,30 13.5,19.5 6,13 15.5,13" fill="#1A1714"/>
+        <circle cx="18" cy="18" r="2.5" fill="#C4963A"/>
+      </svg>
+    </div>
+    <div class="nav-icon active" onclick="switchView('goals',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span class="nav-tip">Goals</span>
+    </div>
+    <div class="nav-icon" onclick="switchView('calendar',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span class="nav-tip">Daily Log</span>
+    </div>
+    <div class="nav-icon" onclick="showCompound()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="nav-tip">1% View</span>
+    </div>
+    <div class="nav-icon" onclick="switchView('circle',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-tip">Circle</span>
+    </div>
+    <div class="nav-icon" onclick="switchView('analytics',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="nav-tip">Analytics</span>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <button class="dark-toggle" id="dark-toggle" onclick="toggleDark()" title="Toggle dark mode">🌙</button>
+    <div class="nav-icon" onclick="openProfile()" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="nav-tip">Settings</span>
+    </div>
+    <div class="avatar" id="user-avatar" onclick="openProfile()" style="cursor:pointer" title="Your profile">JL</div>
+  </nav>
+
+  <div class="main">
+
+    <!-- CENTER PANEL -->
+    <div class="center-panel">
+
+      <!-- GOALS VIEW -->
+      <div class="page-view active" id="view-goals">
+        <div class="page-header">
+          <div>
+            <div class="page-greeting">Sunday, February 22</div>
+            <h1 class="page-title">Your North Stars</h1>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-ghost" onclick="showCompound()">The 1% View</button>
+            <button class="btn btn-primary" onclick="openModal()">+ New Goal</button>
+          </div>
+        </div>
+
+        <div class="momentum-banner" id="momentum-banner" onclick="showAnalytics()" style="cursor:pointer">
+          <div class="momentum-left">
+            <div class="momentum-label">Momentum Score</div>
+            <div class="momentum-main">
+              <!-- Ring -->
+              <div class="momentum-ring-wrap">
+                <div class="momentum-pulse"></div>
+                <svg class="momentum-ring-svg" viewBox="0 0 88 88">
+                  <circle class="momentum-ring-bg" cx="44" cy="44" r="36"/>
+                  <circle class="momentum-ring-fill" id="momentum-ring-fill" cx="44" cy="44" r="36"
+                    stroke-dasharray="226.2" stroke-dashoffset="226.2"/>
+                </svg>
+                <div class="momentum-ring-inner">
+                  <div class="momentum-ring-num" id="momentum-display">0</div>
+                  <div class="momentum-ring-label">/ 100</div>
+                </div>
+              </div>
+              <!-- Stats -->
+              <div class="momentum-copy">
+                <div class="momentum-desc" id="momentum-desc">Loading your momentum...</div>
+                <div class="momentum-fire" id="momentum-fire">🔥 <span id="momentum-streak">0</span> day streak</div>
+                <div class="momentum-stats-row">
+                  <div class="momentum-stat"><div class="momentum-stat-val" id="m-active">0</div><div class="momentum-stat-lbl">Active</div></div>
+                  <div class="momentum-stat"><div class="momentum-stat-val" id="m-rate">0%</div><div class="momentum-stat-lbl">Done rate</div></div>
+                  <div class="momentum-stat"><div class="momentum-stat-val" id="m-pts">+0</div><div class="momentum-stat-lbl">This week</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="momentum-right">
+            <div class="momentum-bars" id="momentum-bars"></div>
+            <div class="momentum-trend" id="momentum-trend">↑ calculating...</div>
+            <div class="momentum-click-hint">CLICK FOR ANALYTICS</div>
+          </div>
+        </div>
+
+        <!-- Search + Filter -->
+        <div class="search-bar-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-bar" id="goal-search" type="text" placeholder="Search goals, categories, intentions..." oninput="filterGoals()">
+        </div>
+        <div class="goal-filter-bar" id="goal-filter-bar">
+          <button class="gf-pill active" data-cat="all" onclick="setGoalFilter('all',this)">All Goals</button>
+          <button class="gf-pill" data-cat="health" onclick="setGoalFilter('health',this)">🏃 Health</button>
+          <button class="gf-pill" data-cat="finance" onclick="setGoalFilter('finance',this)">💰 Finance</button>
+          <button class="gf-pill" data-cat="writing" onclick="setGoalFilter('writing',this)">✍️ Writing</button>
+          <button class="gf-pill" data-cat="body" onclick="setGoalFilter('body',this)">⚖️ Body</button>
+          <button class="gf-pill" data-cat="mindset" onclick="setGoalFilter('mindset',this)">🧠 Mindset</button>
+          <button class="gf-pill" data-cat="custom" onclick="setGoalFilter('custom',this)">⭐ Custom</button>
+        </div>
+        <div class="search-result-count" id="search-result-count" style="display:none"></div>
+        <div class="section-label" id="goals-section-label">Active Goals</div>
+        <div class="goals-grid" id="goals-container">
+          <!-- dynamically rendered by renderGoals() -->
+        </div>
+      </div>
+
+      <!-- CALENDAR / DAILY LOG VIEW -->
+      <div class="page-view" id="view-calendar">
+        <div class="page-header">
+          <div>
+            <div class="page-greeting">Track every day</div>
+            <h1 class="page-title">Daily Log</h1>
+          </div>
+        </div>
+
+        <!-- Month stats strip -->
+        <div class="cal-stats-strip">
+          <div class="cal-stat-block">
+            <div class="cal-stat-val" id="stat-logged">0</div>
+            <div class="cal-stat-label">Days Logged</div>
+            <div class="cal-stat-bar"><div class="cal-stat-bar-fill" id="stat-logged-bar" style="width:0%"></div></div>
+          </div>
+          <div class="cal-stat-block">
+            <div class="cal-stat-val" id="stat-tasks">0</div>
+            <div class="cal-stat-label">Tasks Done</div>
+            <div class="cal-stat-bar"><div class="cal-stat-bar-fill" id="stat-tasks-bar" style="width:0%;background:var(--sage)"></div></div>
+          </div>
+          <div class="cal-stat-block">
+            <div class="cal-stat-val" id="stat-streak">0 🔥</div>
+            <div class="cal-stat-label">Day Streak</div>
+            <div class="cal-stat-bar"><div class="cal-stat-bar-fill" id="stat-streak-bar" style="width:0%;background:var(--rose)"></div></div>
+          </div>
+          <div class="cal-stat-block">
+            <div class="cal-stat-val" id="stat-pct">0%</div>
+            <div class="cal-stat-label">Month Progress</div>
+            <div class="cal-stat-bar"><div class="cal-stat-bar-fill" id="stat-pct-bar" style="width:0%;background:var(--sky)"></div></div>
+          </div>
+        </div>
+
+        <div class="cal-header">
+          <div class="cal-nav">
+            <button class="cal-arrow" onclick="changeMonth(-1)">&#8592;</button>
+            <div class="cal-month" id="cal-month-label">February 2026</div>
+            <button class="cal-arrow" onclick="changeMonth(1)">&#8594;</button>
+          </div>
+          <div class="cal-filters-panel">
+            <!-- Active goals this month — pill strip -->
+            <div class="cal-goals-strip" id="cal-goals-strip"></div>
+
+            <!-- Category filter — dynamically populated from goals -->
+            <div class="cal-cat-bar" id="cal-cat-bar">
+              <div class="cal-cat-pill active" data-cat="all" onclick="calSetCat('all',this)">All</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cal-grid-labels">
+          <div class="cal-day-label">Sun</div><div class="cal-day-label">Mon</div><div class="cal-day-label">Tue</div><div class="cal-day-label">Wed</div><div class="cal-day-label">Thu</div><div class="cal-day-label">Fri</div><div class="cal-day-label">Sat</div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <!-- ALWAYS-VISIBLE panel: today's intentions + goal sub-tasks -->
+        <div class="always-panel" id="always-panel">
+          <div class="always-head">
+            <div class="always-title">Today's Intentions</div>
+            <div class="always-datetag" id="always-datetag">Feb 22, 2026</div>
+          </div>
+          <div class="always-body" id="always-body">
+            <!-- rendered by renderAlwaysPanel() -->
+          </div>
+        </div>
+
+        <!-- Daily log panel — opens when a calendar day is clicked -->
+        <div class="daily-log-panel" id="daily-log-panel" style="display:none">
+          <div class="log-panel-head">
+            <div class="log-date-heading" id="log-date-heading">Sunday, February 22</div>
+            <div class="log-sub" id="log-sub">Log your progress, check intentions &amp; leave a reflection.</div>
+            <div class="log-glance-row" id="log-glance-row"></div>
+          </div>
+
+          <div class="log-body">
+            <!-- Goal metric inputs — dynamically rendered -->
+            <div id="log-goal-metrics"></div>
+
+            <div class="log-section-title">Intentions</div>
+            <div class="task-list" id="task-list"></div>
+            <div class="add-task-row">
+              <input type="text" class="add-task-input" id="new-task-input" placeholder="Add an intention for this day…" onkeydown="if(event.key==='Enter')addTask()">
+              <button class="add-task-btn" onclick="addTask()">+ Add</button>
+            </div>
+
+            <br>
+            <div class="log-section-title">How Was This Day?</div>
+            <div class="log-dropdowns">
+              <div>
+                <label class="log-select-label">Mood</label>
+                <select class="log-select" id="mood-select">
+                  <option value="">— Choose mood —</option>
+                  <option value="🌟">🌟 Energized</option>
+                  <option value="😊">😊 Good</option>
+                  <option value="😐">😐 Neutral</option>
+                  <option value="😓">😓 Tired</option>
+                  <option value="😔">😔 Low</option>
+                  <option value="🔥">🔥 Focused</option>
+                  <option value="😰">😰 Anxious</option>
+                </select>
+              </div>
+              <div>
+                <label class="log-select-label">Sleep</label>
+                <select class="log-select" id="sleep-select">
+                  <option value="">— Hours slept —</option>
+                  <option value="under5">😴 Under 5 hrs</option>
+                  <option value="5to6">🌙 5–6 hrs</option>
+                  <option value="6to7">✨ 6–7 hrs</option>
+                  <option value="7to8">⭐ 7–8 hrs</option>
+                  <option value="over8">🌟 8+ hrs</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="log-note">
+              <label class="log-select-label">Reflection <span style="opacity:0.4;font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label>
+              <textarea class="log-note-input" id="day-note" placeholder="What stood out today? What will you carry forward?"></textarea>
+            </div>
+
+            <button class="log-save-btn" onclick="saveLog()">Save This Day's Log →</button>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- ANALYTICS VIEW -->
+      <div class="page-view" id="view-analytics">
+        <div class="page-header">
+          <div>
+            <div class="page-greeting">Your progress, visualized</div>
+            <h1 class="page-title">Analytics</h1>
+          </div>
+          <div class="header-actions">
+            <div class="data-actions" style="margin:0">
+              <button class="data-btn" onclick="exportData()" title="Export your goals as JSON">📤 Export</button>
+              <button class="data-btn import-btn" onclick="document.getElementById('import-file').click()" title="Import goals from backup">📥 Import</button>
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI strip -->
+        <div class="analytics-grid" id="analytics-kpi-grid">
+          <!-- rendered by renderAnalytics() -->
+        </div>
+
+        <!-- Weekly activity chart -->
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <div class="chart-card-title">7-Day Activity — Tasks Completed</div>
+            <div class="weekly-chart-switch">
+              <button class="chart-arrow-btn" onclick="changeWeeklyChart(-1)" aria-label="Show previous chart">&#8592;</button>
+              <button class="chart-arrow-btn" onclick="changeWeeklyChart(1)" aria-label="Show next chart">&#8594;</button>
+            </div>
+          </div>
+          <div class="weekly-chart-stage" id="weekly-chart-stage"></div>
+          <div class="weekly-chart-labels" id="weekly-chart-labels"></div>
+        </div>
+
+        <!-- Category breakdown -->
+        <div class="chart-card">
+          <div class="chart-card-title">Progress by Category</div>
+          <div id="cat-breakdown"></div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="achievements-section">
+          <div class="section-label" style="margin-bottom:14px">🏆 Achievements</div>
+          <div class="achievements-grid" id="achievements-grid">
+            <!-- rendered by renderAchievements() -->
+          </div>
+        </div>
+
+        <!-- Lifetime stats -->
+        <div class="chart-card" id="lifetime-stats-card">
+          <div class="chart-card-title">Lifetime Statistics</div>
+          <div id="lifetime-stats"></div>
+        </div>
+      </div>
+
+      <!-- CIRCLE VIEW -->
+      <div class="page-view" id="view-circle">
+        <div class="page-header">
+          <div>
+            <div class="page-greeting">Stay accountable</div>
+            <h1 class="page-title">Your Circle</h1>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-ghost" onclick="showToast('Invite link copied!')">+ Invite</button>
+          </div>
+        </div>
+
+        <!-- My Circle — horizontal member strip -->
+        <div class="section-label">My Accountability Circle</div>
+        <div class="circle-members-strip">
+          <!-- You -->
+          <div class="circle-member-card you-card">
+            <div class="cm-avatar" style="background:linear-gradient(135deg,var(--gold),var(--rose))">JL<div class="cm-online"></div></div>
+            <div class="cm-name">You</div>
+            <div class="cm-streak">14🔥 streak</div>
+            <div class="cm-tag">Marathon</div>
+          </div>
+          <div class="circle-member-card" onclick="showToast('Viewing Sarah\'s profile')">
+            <div class="cm-avatar" style="background:var(--sage)">SM<div class="cm-online"></div></div>
+            <div class="cm-name">Sarah M.</div>
+            <div class="cm-streak">22🔥 streak</div>
+            <div class="cm-tag">Running</div>
+          </div>
+          <div class="circle-member-card" onclick="showToast('Viewing Tom\'s profile')">
+            <div class="cm-avatar" style="background:var(--rose)">TK</div>
+            <div class="cm-name">Tom K.</div>
+            <div class="cm-streak">7🔥 streak</div>
+            <div class="cm-tag">Fitness</div>
+          </div>
+          <div class="circle-member-card" onclick="showToast('Viewing Maya\'s profile')">
+            <div class="cm-avatar" style="background:var(--sky)">MR<div class="cm-online"></div></div>
+            <div class="cm-name">Maya R.</div>
+            <div class="cm-streak">31🔥 streak</div>
+            <div class="cm-tag">Writing</div>
+          </div>
+          <div class="circle-member-card" onclick="showToast('Viewing Priya\'s profile')">
+            <div class="cm-avatar" style="background:var(--violet,#7B6FA0)">PD</div>
+            <div class="cm-name">Priya D.</div>
+            <div class="cm-streak">5🔥 streak</div>
+            <div class="cm-tag">Finance</div>
+          </div>
+          <div class="circle-member-card cm-invite-card" onclick="showToast('Invite link copied! Share with a friend.')">
+            <div class="cm-avatar" style="background:var(--cream-dark);color:var(--ink-muted);font-size:20px">+</div>
+            <div class="cm-name" style="color:var(--ink-muted)">Add</div>
+            <div class="cm-streak" style="opacity:0">—</div>
+            <div class="cm-tag">Invite</div>
+          </div>
+        </div>
+
+        <!-- Full-width feed — leaderboard lives in right sidebar -->
+        <div>
+
+          <!-- Post composer -->
+          <div class="post-composer">
+            <div class="composer-top">
+              <div class="composer-avatar">JL</div>
+              <textarea class="composer-input" id="composer-text" placeholder="Share a win, a struggle, or what you showed up for today…"></textarea>
+            </div>
+            <div class="composer-footer">
+              <div class="composer-tags">
+                <button class="composer-tag" onclick="toggleComposerTag(this)">🏃 Marathon</button>
+                <button class="composer-tag" onclick="toggleComposerTag(this)">✍️ Novel</button>
+                <button class="composer-tag" onclick="toggleComposerTag(this)">💰 Savings</button>
+              </div>
+              <button class="composer-post" onclick="postUpdate()">Post update →</button>
+            </div>
+          </div>
+
+          <!-- Feed tabs -->
+          <div class="feed-tabs">
+            <div class="feed-tab active" onclick="switchFeed('circle',this)">My Circle</div>
+            <div class="feed-tab" onclick="switchFeed('community',this)">Community</div>
+            <div class="feed-tab" onclick="switchFeed('mine',this)">My Updates</div>
+          </div>
+
+          <!-- Feed posts container -->
+          <div id="feed-container"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel" id="right-panel">
+
+      <!-- Default panel: Goals + constellation -->
+      <div id="rp-default">
+        <div class="right-panel-title">Your Constellation</div>
+        <div class="constellation-wrap">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+            <div>
+              <div class="constellation-label">Visual Progress Map</div>
+              <div class="constellation-subtitle" id="constellation-subtitle">Every action forms your pattern</div>
+            </div>
+          </div>
+          <div class="constellation-tf" id="constellation-tf">
+            <button class="ctf-btn" onclick="setConstellationRange('7d',this)">7D</button>
+            <button class="ctf-btn active" onclick="setConstellationRange('30d',this)">30D</button>
+            <button class="ctf-btn" onclick="setConstellationRange('3m',this)">3M</button>
+            <button class="ctf-btn" onclick="setConstellationRange('6m',this)">6M</button>
+            <button class="ctf-btn" onclick="setConstellationRange('1y',this)">1Y</button>
+          </div>
+          <canvas id="constellation-canvas"></canvas>
+          <div class="constellation-hint" id="constellation-hint">30-day activity map · <span id="constellation-stats" style="color:var(--gold);opacity:0.9"></span></div>
+        </div>
+
+        <div class="intentions-card">
+          <div class="intention-title" style="display:flex;align-items:center;justify-content:space-between;">
+            Today's Intentions
+            <button onclick="openIntentionAdder()" style="width:24px;height:24px;border-radius:50%;background:var(--ink);border:none;color:var(--cream);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.2s;" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">+</button>
+          </div>
+          <div id="intentions-list">
+            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">10km morning run — easy pace</div><span class="intention-goal-tag" style="background:var(--gold)">Marathon</span></div>
+            <div class="intention-item done" onclick="toggleIntention(this)"><div class="intention-check">✓</div><div class="intention-text">Write 700 words before lunch</div><span class="intention-goal-tag" style="background:var(--sage)">Novel</span></div>
+            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">Transfer $300 to savings</div><span class="intention-goal-tag" style="background:var(--sky)">Savings</span></div>
+            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">Post a check-in for Sarah</div><span class="intention-goal-tag" style="background:var(--ink)">Circle</span></div>
+          </div>
+          <!-- Add intention inline input — hidden until + clicked -->
+          <div id="intention-adder" style="display:none;margin-top:10px;border-top:1px solid var(--cream-dark);padding-top:12px;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" id="intention-text-input" placeholder="What do you intend to do today?" style="flex:1;padding:9px 12px;border:1.5px solid var(--cream-dark);border-radius:9px;background:var(--cream);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ink);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--ink-muted)'" onblur="this.style.borderColor='var(--cream-dark)'" onkeydown="if(event.key==='Enter')addIntention()">
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:10px;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;font-weight:500;margin-right:2px;">Tag:</span>
+              <button class="itag-btn sel" data-color="var(--gold)" data-label="Marathon" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #C4963A;background:#C4963A;color:white;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Marathon</button>
+              <button class="itag-btn" data-color="var(--sage)" data-label="Novel" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Novel</button>
+              <button class="itag-btn" data-color="var(--sky)" data-label="Savings" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Savings</button>
+              <button class="itag-btn" data-color="var(--ink)" data-label="Circle" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Circle</button>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:10px;">
+              <button onclick="addIntention()" style="flex:1;padding:9px;background:var(--ink);color:var(--cream);border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">Add intention</button>
+              <button onclick="closeIntentionAdder()" style="padding:9px 14px;background:transparent;color:var(--ink-muted);border:1.5px solid var(--cream-dark);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="community-title">Circle Check-ins</div>
+          <div class="checkin-item"><div class="checkin-avatar" style="background:var(--sage)">SM</div><div><div class="checkin-name">Sarah M.</div><div class="checkin-msg">"Ran 18km today. Wanted to stop at 14. Didn't."</div><div class="react-row"><button class="react-btn active" onclick="toggleReact(this)">🔥 4</button><button class="react-btn" onclick="toggleReact(this)">💪 2</button><button class="react-btn" onclick="toggleReact(this)">Reply</button></div><div class="checkin-time">2 hours ago</div></div></div>
+          <div class="checkin-item"><div class="checkin-avatar" style="background:var(--rose)">TK</div><div><div class="checkin-name">Tom K.</div><div class="checkin-msg">"Missed my run yesterday. Back at it today. The pattern wins."</div><div class="react-row"><button class="react-btn" onclick="toggleReact(this)">🔥 1</button><button class="react-btn" onclick="toggleReact(this)">💙 3</button><button class="react-btn" onclick="toggleReact(this)">Reply</button></div><div class="checkin-time">5 hours ago</div></div></div>
+          <div class="checkin-item"><div class="checkin-avatar" style="background:var(--sky)">MR</div><div><div class="checkin-name">Maya R.</div><div class="checkin-msg">"1,200 words today. Writing finally feels like breathing."</div><div class="react-row"><button class="react-btn" onclick="toggleReact(this)">✨ 6</button><button class="react-btn" onclick="toggleReact(this)">Reply</button></div><div class="checkin-time">Yesterday</div></div></div>
+        </div>
+      </div>
+
+      <!-- Circle panel: leaderboard + shared goals + hot this week -->
+      <div id="rp-circle" style="display:none">
+        <div class="right-panel-title">Global Rankings</div>
+
+        <div class="lb-card">
+          <div class="lb-label">North Star App · Feb 2026</div>
+          <div class="lb-title">Top 10 Leaderboard 🏆</div>
+          <div class="lb-sub">Ranked by momentum score</div>
+          <div id="lb-rows-sidebar"></div>
+          <div class="lb-footer">Rankings update daily.<br>Keep showing up — every day counts.</div>
+        </div>
+
+        <!-- Shared Goals -->
+        <div class="shared-goals-wrap" style="margin-top:16px;">
+          <div class="sg-header">Shared Goals</div>
+          <div class="sg-row">
+            <div class="sg-icon">🏃</div>
+            <div class="sg-info">
+              <div class="sg-name">Run a Marathon</div>
+              <div class="sg-avatars">
+                <div class="sg-av" style="background:linear-gradient(135deg,var(--gold),var(--rose))">JL</div>
+                <div class="sg-av" style="background:var(--sage)">SM</div>
+                <div class="sg-av" style="background:var(--rose)">TK</div>
+              </div>
+            </div>
+            <div class="sg-pct">65%</div>
+          </div>
+          <div class="sg-row">
+            <div class="sg-icon">✍️</div>
+            <div class="sg-info">
+              <div class="sg-name">Write a Book</div>
+              <div class="sg-avatars">
+                <div class="sg-av" style="background:linear-gradient(135deg,var(--gold),var(--rose))">JL</div>
+                <div class="sg-av" style="background:var(--sky)">MR</div>
+              </div>
+            </div>
+            <div class="sg-pct">35%</div>
+          </div>
+          <div class="sg-row">
+            <div class="sg-icon">💰</div>
+            <div class="sg-info">
+              <div class="sg-name">Save $20K</div>
+              <div class="sg-avatars">
+                <div class="sg-av" style="background:linear-gradient(135deg,var(--gold),var(--rose))">JL</div>
+                <div class="sg-av" style="background:#7B6FA0">PD</div>
+              </div>
+            </div>
+            <div class="sg-pct">80%</div>
+          </div>
+        </div>
+
+        <!-- Hot This Week -->
+        <div style="margin-top:16px;">
+          <div class="community-title">Hot This Week 🔥</div>
+          <div class="checkin-item">
+            <div class="checkin-avatar" style="background:#5DAD82">AN</div>
+            <div>
+              <div class="checkin-name">Anika N. <span style="font-size:10px;background:var(--gold-dim);color:var(--gold);padding:1px 6px;border-radius:100px;font-weight:600">↑ +12 rank</span></div>
+              <div class="checkin-msg">"30-day streak. I never thought I'd be this person."</div>
+              <div class="react-row" style="margin-top:5px;"><button class="react-btn" onclick="toggleReact(this)">🔥 18</button><button class="react-btn" onclick="toggleReact(this)">⭐ 9</button></div>
+            </div>
+          </div>
+          <div class="checkin-item">
+            <div class="checkin-avatar" style="background:#7B6FA0">JW</div>
+            <div>
+              <div class="checkin-name">James W. <span style="font-size:10px;background:var(--gold-dim);color:var(--gold);padding:1px 6px;border-radius:100px;font-weight:600">↑ +8 rank</span></div>
+              <div class="checkin-msg">"Paid off $5K debt this month. Never looking back."</div>
+              <div class="react-row" style="margin-top:5px;"><button class="react-btn" onclick="toggleReact(this)">💪 11</button><button class="react-btn" onclick="toggleReact(this)">✨ 7</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Goal Modal — 3 steps -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+
+    <div class="modal-steps-bar">
+      <div class="msb-pip msb-on"  id="pip0"></div>
+      <div class="msb-pip"         id="pip1"></div>
+      <div class="msb-pip"         id="pip2"></div>
+    </div>
+
+    <!-- PAGE 1: Category + Name + Why -->
+    <div class="modal-page mp-active" id="mpg1">
+      <div class="modal-title">Plant a New Star</div>
+      <div class="modal-subtitle">What kind of goal is this? Each category uses a different metric to track daily progress.</div>
+
+      <div class="form-group">
+        <label class="form-label">Goal Category</label>
+        <div class="cat-pick-grid">
+          <div class="cat-pick cp-sel" data-cat="health" data-hex="#6B8C7A" data-unit="km" onclick="pickCat(this)">
+            <span class="cp-icon">🏃</span>
+            <div class="cp-name">Health & Fitness</div>
+            <div class="cp-hint">km · miles · hours · reps</div>
+          </div>
+          <div class="cat-pick" data-cat="finance" data-hex="#5B7EA6" data-unit="$" onclick="pickCat(this)">
+            <span class="cp-icon">💰</span>
+            <div class="cp-name">Finance</div>
+            <div class="cp-hint">$ saved · debt paid</div>
+          </div>
+          <div class="cat-pick" data-cat="writing" data-hex="#C4963A" data-unit="words" onclick="pickCat(this)">
+            <span class="cp-icon">✍️</span>
+            <div class="cp-name">Writing & Creative</div>
+            <div class="cp-hint">words · pages · chapters</div>
+          </div>
+          <div class="cat-pick" data-cat="body" data-hex="#B5705B" data-unit="kg" onclick="pickCat(this)">
+            <span class="cp-icon">⚖️</span>
+            <div class="cp-name">Body Composition</div>
+            <div class="cp-hint">kg · lbs · body fat %</div>
+          </div>
+          <div class="cat-pick" data-cat="mindset" data-hex="#7B6FA0" data-unit="hrs" onclick="pickCat(this)">
+            <span class="cp-icon">🧠</span>
+            <div class="cp-name">Mindset & Learning</div>
+            <div class="cp-hint">hours · sessions · books</div>
+          </div>
+          <div class="cat-pick" data-cat="custom" data-hex="#8C857D" data-unit="" onclick="pickCat(this)">
+            <span class="cp-icon">⭐</span>
+            <div class="cp-name">Custom</div>
+            <div class="cp-hint">Define your own unit</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">The Goal</label>
+        <input type="text" class="form-input" id="ng-name" placeholder="e.g. Run a marathon, Write a book, Save $20K…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Your Why — the emotional anchor</label>
+        <textarea class="form-input why-input" id="ng-why" placeholder="Why does this matter to you? Write it like a letter to yourself…"></textarea>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <span class="modal-step-lbl">Step 1 of 3</span>
+        <button class="btn btn-primary" onclick="modalGoTo(2)">Next: Measure it →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 2: Target + Unit + Timeframe + Milestones -->
+    <div class="modal-page" id="mpg2">
+      <div class="modal-title">Define Your Progress</div>
+      <div class="modal-subtitle">Set a measurable target and optional timeframe. This is how every daily log contributes to your goal.</div>
+
+      <div class="metric-cfg">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Target Amount</label>
+          <input type="number" class="form-input" id="ng-target" placeholder="e.g. 650" min="0">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Unit of Measurement</label>
+          <input type="text" class="form-input" id="ng-unit" placeholder="km, $, words, kg…">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Starting Point (current progress, optional)</label>
+        <input type="number" class="form-input" id="ng-current" placeholder="0" value="0" min="0">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Timeframe <span style="opacity:0.45;font-size:10px;letter-spacing:0;text-transform:none;font-style:italic">(optional — shows goal on calendar only during this period)</span></label>
+        <div class="timeframe-cfg">
+          <div>
+            <label class="form-label" style="margin-bottom:5px">Start Date</label>
+            <input type="date" class="date-input" id="ng-start" value="2026-02-01">
+          </div>
+          <div>
+            <label class="form-label" style="margin-bottom:5px">End Date</label>
+            <input type="date" class="date-input" id="ng-end">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Milestones <span style="opacity:0.45;font-size:10px;letter-spacing:0;text-transform:none;font-style:italic">(comma-separated, e.g. 5K, 10K, Race Day)</span></label>
+        <input type="text" class="form-input" id="ng-milestones" placeholder="e.g. 5K, Half Marathon, Race Day">
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="modalGoTo(1)">← Back</button>
+        <span class="modal-step-lbl">Step 2 of 3</span>
+        <button class="btn btn-primary" onclick="modalGoTo(3)">Next: Add Tasks →</button>
+      </div>
+    </div>
+
+    <!-- PAGE 3: Linked daily sub-tasks/intentions -->
+    <div class="modal-page" id="mpg3">
+      <div class="modal-title">Linked Daily Intentions</div>
+      <div class="modal-subtitle">These tasks auto-appear on your calendar every day within this goal's timeframe — visible under "Today's Intentions."</div>
+
+      <div id="ng-subs-list" style="min-height:32px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" class="form-input" id="ng-sub-input" placeholder="e.g. 10km morning run, Write 700 words…" onkeydown="if(event.key==='Enter'){event.preventDefault();addModalSub()}" style="font-size:13px;">
+        <button class="btn btn-ghost" onclick="addModalSub()" style="padding:10px 16px;white-space:nowrap;">+ Add</button>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);line-height:1.65;background:var(--cream);padding:11px 14px;border-radius:10px;">
+        💡 These repeating tasks will appear under your calendar's "Today's Intentions" on every day within your goal's timeframe, grouped under the goal name.
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="modalGoTo(2)">← Back</button>
+        <span class="modal-step-lbl">Step 3 of 3</span>
+        <button class="btn btn-primary" onclick="addGoal()">Plant this Star ⭐</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- Compound View -->
+<div class="compound-view" id="compound-view">
+  <div class="compound-ambient"></div>
+  <button class="compound-close" onclick="closeCompound()">×</button>
+  <div class="compound-title">The 1% View</div>
+  <div class="compound-headline">Small actions,<br>extraordinary results.</div>
+  <div class="compound-sub">What 1% daily improvement looks like over 365 days</div>
+  <div class="compound-chart-wrap"><canvas id="compound-canvas"></canvas></div>
+  <div class="compound-quote" id="compound-quote"></div>
+</div>
+
+
+<!-- ═══════════ AUTH SCREEN ═══════════ -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg class="auth-logo-icon" viewBox="0 0 36 36" fill="none">
+        <polygon points="18,3 20.5,13 30,13 22.5,19.5 25.5,30 18,23.5 10.5,30 13.5,19.5 6,13 15.5,13" fill="#1A1714"/>
+        <circle cx="18" cy="18" r="2.5" fill="#C4963A"/>
+      </svg>
+      <div class="auth-logo-name">North Star</div>
+    </div>
+    <div id="auth-mode-login">
+      <div class="auth-title" id="auth-title">Welcome back.</div>
+      <div class="auth-sub" id="auth-sub">Sign in to continue your journey.</div>
+      <button class="auth-oauth-btn" onclick="authOAuth('google')">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <button class="auth-oauth-btn" onclick="authOAuth('facebook')">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        Continue with Facebook
+      </button>
+      <div class="auth-divider"><div class="auth-divider-line"></div><div class="auth-divider-txt">or email</div><div class="auth-divider-line"></div></div>
+      <div class="auth-form-group">
+        <label class="auth-label">Email</label>
+        <input class="auth-input" id="auth-email" type="email" placeholder="you@example.com">
+      </div>
+      <div class="auth-form-group">
+        <label class="auth-label">Password</label>
+        <input class="auth-input" id="auth-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()">
+      </div>
+      <button class="auth-submit" onclick="authSubmit()" id="auth-submit-btn">Sign In →</button>
+      <div class="auth-toggle">
+        Don't have an account?
+        <button class="auth-toggle-btn" onclick="toggleAuthMode()">Create one free</button>
+      </div>
+    </div>
+    <div class="auth-skip">
+      <button class="auth-skip-btn" onclick="skipAuth()">Continue without account (demo mode)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ADD A MOMENT MODAL ═══════════ -->
+<div class="moment-modal-overlay" id="moment-modal-overlay">
+  <div class="moment-modal">
+    <div class="moment-modal-title">📝 Add a Moment</div>
+    <div class="moment-modal-sub" id="moment-modal-sub">Capture a reflection for this goal. What happened? How did it feel?</div>
+    <textarea class="moment-textarea" id="moment-text" placeholder="Write your moment here... (max 100 words)" oninput="checkMomentWords()"></textarea>
+    <div class="moment-word-count" id="moment-word-count">0 / 100 words</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--ink-muted)">
+      <span id="moment-author-lbl"></span>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:16px">
+      <button class="btn btn-primary" onclick="saveMoment()" style="flex:1">Save Moment ✓</button>
+      <button class="btn btn-ghost" onclick="closeMomentModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ ADD PEER MODAL ═══════════ -->
+<div class="peer-modal-overlay" id="peer-modal-overlay">
+  <div class="peer-modal">
+    <div class="peer-modal-title">👥 Add to Circle</div>
+    <div class="peer-modal-sub" id="peer-modal-sub">Share this goal with your accountability circle.</div>
+    <div id="peer-options-list"></div>
+    <div class="peer-invite-section">
+      <div class="peer-invite-label">Or invite by email</div>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="peer-invite-email" type="email" placeholder="friend@example.com" style="font-size:12px;padding:9px 12px">
+        <button class="btn btn-ghost" onclick="sendPeerInvite()" style="white-space:nowrap;font-size:12px">Send Invite</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:16px">
+      <button class="btn btn-primary" onclick="savePeerModal()" style="flex:1">Add Selected →</button>
+      <button class="btn btn-ghost" onclick="closePeerModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PROFILE MODAL ═══════════ -->
+<div class="profile-modal-overlay" id="profile-modal-overlay">
+  <div class="profile-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-family:'Playfair Display',serif;font-size:20px;font-weight:600">Your Profile</h2>
+      <button onclick="closeProfile()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink-muted)">×</button>
+    </div>
+    <!-- Avatar upload -->
+    <div class="profile-avatar-upload" onclick="document.getElementById('avatar-file').click()" id="profile-avatar-wrap">
+      <img id="profile-avatar-img" src="" style="display:none" class="profile-avatar-img">
+      <span id="profile-avatar-emoji" style="font-size:28px">👤</span>
+      <div class="profile-avatar-overlay">📷</div>
+    </div>
+    <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+    <!-- Form fields -->
+    <div class="form-group">
+      <label class="form-label">Full Name</label>
+      <input class="form-input" id="profile-name" type="text" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input class="form-input" id="profile-email" type="email" placeholder="you@example.com">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Age</label>
+        <input class="form-input" id="profile-age" type="number" placeholder="Age" min="1" max="120">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <input class="form-input" id="profile-location" type="text" placeholder="City, Country">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bio <span style="opacity:0.4;font-size:10px;text-transform:none">(optional)</span></label>
+      <textarea class="form-input" id="profile-bio" rows="2" placeholder="A sentence about you and your goals..." style="resize:none;height:56px"></textarea>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:4px">
+      <button class="btn btn-primary" onclick="saveProfile()" style="flex:1">Save Profile ✓</button>
+      <button class="btn btn-ghost" onclick="closeProfile()">Cancel</button>
+    </div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--cream-dark)">
+      <div class="section-label" style="margin-bottom:10px">Data & Privacy</div>
+      <div class="data-actions">
+        <button class="data-btn" onclick="exportData()">📤 Export Goals</button>
+        <button class="data-btn import-btn" onclick="document.getElementById('import-file2').click()">📥 Import</button>
+        <input type="file" id="import-file2" accept=".json" style="display:none" onchange="importData(this)">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+  <!-- Scripts: load in dependency order -->
+  <script src="js/data.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/goals.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
