@@ -1,4 +1,4 @@
-/* North Star — Features: Dark Mode, Analytics, Auth, Achievements */
+/* North Star ? Features: Dark Mode, Analytics, Auth, Achievements */
 
 .compound-view { position: fixed; inset: 0; background: var(--dark-bg); z-index: 2200; padding: 50px 40px 40px; display: none; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .compound-view.open { display: flex; }
@@ -18,7 +18,7 @@
 
   @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
 
-  /* ═══ DARK MODE ═══ */
+  /* --- DARK MODE --- */
   body.dark {
     --cream: #1B1816; --cream-dark: #332C27; --ink: #F3ECE3;
     --ink-soft: #D5CABD; --ink-muted: #A89D90; --paper: #141210;
@@ -32,9 +32,25 @@
   body.dark .cat-pick { background: #1C1917; border-color: #2A2522; }
   body.dark .modal { background: #1C1917; }
   body.dark .modal-overlay { background: rgba(0,0,0,0.7); }
-  body.dark .daily-log-panel { background: #1C1917; border-color: #2A2522; }
-  body.dark .add-task-input { background: #141210; border-color: #2A2522; color: var(--ink); }
   body.dark .always-panel { background: #1C1917; border-color: #2A2522; }
+  body.dark .always-head { background: #141210; border-color: #2A2522; }
+  body.dark .always-sub { color: #A89D90; }
+  body.dark .always-goal-block { background: #141210; border-color: #2A2522; }
+  body.dark .always-goal-items { border-top-color: #2A2522; }
+  body.dark .always-log-wrap { border-top-color: #2A2522; }
+  body.dark .always-day-progress-track { background: #2A2522; }
+  body.dark .always-intention-adder { background: #141210; border-color: #2A2522; }
+  body.dark .always-intention-input,
+  body.dark .always-kind-btn,
+  body.dark .always-date-nav-btn,
+  body.dark .always-custom-schedule-btn,
+  body.dark .always-custom-day,
+  body.dark .always-custom-interval-btn,
+  body.dark .always-intention-cancel { background: #1C1917; border-color: #2A2522; color: var(--ink); }
+  body.dark .always-custom-schedule-panel { background: #1A1714; border-color: #3A332C; }
+  body.dark .always-kind-btn.sel,
+  body.dark .always-custom-interval-btn.sel { border-color: #D2B56F; }
+  body.dark .always-motivation-quote { background: #141210; border-color: #2A2522; color: #D5CABD; }
   body.dark .always-task { background: #141210; border-color: #2A2522; }
   body.dark .at-chk { background: #1C1917; }
   body.dark .cal-cell { background: #1C1917; border-color: #2A2522; }
@@ -43,8 +59,7 @@
   body.dark .intention-item { border-color: #2A2522; background: #141210; }
   body.dark .right-panel { background: #141210; border-color: #2A2522; }
   body.dark .sidebar { background: var(--paper); border-color: #2A2522; }
-  body.dark .cal-stats-strip, body.dark .log-panel-head { background: #141210; }
-  body.dark .log-body { background: #1C1917; }
+  body.dark .cal-stats-strip { background: #141210; }
   body.dark .log-select, body.dark .log-note-input { background: #141210; border-color: #2A2522; color: var(--ink); }
   body.dark .new-sub-chip { background: #141210; border-color: #2A2522; }
   body.dark .milestone-chip { background: #2A2522; border-color: #3A332C; }
@@ -146,7 +161,7 @@
   }
   .dark-toggle:hover { border-color: var(--ink-muted); }
 
-  /* ═══ SEARCH BAR ═══ */
+  /* --- SEARCH BAR --- */
   .search-bar-wrap {
     position: relative; margin-bottom: 20px;
   }
@@ -163,7 +178,7 @@
   .search-result-count { font-size: 11px; color: var(--ink-muted); margin-top: -14px; margin-bottom: 14px; }
   body.dark .search-bar { background: #1C1917; border-color: #2A2522; }
 
-  /* ═══ CATEGORY FILTER BAR (goals view) ═══ */
+  /* --- CATEGORY FILTER BAR (goals view) --- */
   .goal-filter-bar {
     display: flex; gap: 7px; margin-bottom: 18px; flex-wrap: wrap; align-items: center;
   }
@@ -175,7 +190,7 @@
   .gf-pill.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
   .gf-pill:hover:not(.active) { border-color: var(--ink-muted); color: var(--ink); }
 
-  /* ═══ ACHIEVEMENTS ═══ */
+  /* --- ACHIEVEMENTS --- */
   .achievements-section { margin-bottom: 24px; }
   .achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 9px; }
   .badge-card {
@@ -192,7 +207,7 @@
   body.dark .badge-card { background: #1C1917; border-color: #2A2522; }
   body.dark .badge-card.unlocked { border-color: var(--gold); }
 
-  /* ═══ ENHANCED MOMENTUM BANNER ═══ */
+  /* --- ENHANCED MOMENTUM BANNER --- */
   .momentum-ring-wrap {
     position: relative; width: 88px; height: 88px; flex-shrink: 0;
   }
@@ -200,10 +215,10 @@
   .momentum-ring-bg { fill: none; stroke: rgba(26,23,20,0.14); stroke-width: 5; }
   .momentum-ring-fill { fill: none; stroke: var(--gold); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1); }
   .momentum-ring-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .momentum-ring-num { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 600; color: #1A1714; line-height: 1; }
+  .momentum-ring-num { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 600; color: #1A1714; line-height: 1.08; }
   .momentum-ring-label { font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); opacity: 0.9; }
-  .momentum-stats-row { display: flex; gap: 14px; margin-top: 12px; }
-  .momentum-stat { text-align: center; }
+  .momentum-stats-row { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .momentum-stat { text-align: center; min-width: 64px; }
   .momentum-stat-val { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; color: #1A1714; }
   .momentum-stat-lbl { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(26,23,20,0.55); margin-top: 1px; }
   .momentum-pulse { position: absolute; inset: -4px; border-radius: 50%; border: 1px solid rgba(196,150,58,0.2); animation: mpulse 2.5s ease-in-out infinite; }
@@ -233,7 +248,7 @@
   body:not(.dark) .momentum-fire,
   body:not(.dark) .momentum-stats-row { display: none; }
 
-  /* ═══ ANALYTICS VIEW ═══ */
+  /* --- ANALYTICS VIEW --- */
   .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
   .analytics-card {
     border-radius: 16px; border: 1.5px solid var(--cream-dark); background: var(--paper);
@@ -258,7 +273,7 @@
     display: flex; align-items: center; justify-content: center; transition: all 0.2s;
   }
   .chart-arrow-btn:hover { border-color: var(--ink-muted); color: var(--ink); }
-  .weekly-chart-stage { height: 74px; }
+  .weekly-chart-stage { min-height: 84px; height: 84px; overflow: visible; }
   .weekly-chart-bars { display: flex; align-items: flex-end; gap: 4px; }
   .weekly-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
   .weekly-bar {
@@ -275,7 +290,7 @@
   }
   .weekly-line-point { fill: var(--gold); stroke: var(--gold); stroke-width: 1.7; }
   .weekly-line-point.latest { fill: var(--gold-light); stroke: var(--gold-light); }
-  .weekly-chart-labels { display: flex; gap: 4px; margin-top: 4px; }
+  .weekly-chart-labels { display: flex; gap: 4px; margin-top: 6px; min-height: 12px; }
   .weekly-day-label {
     flex: 1; text-align: center; font-size: 9px; color: var(--ink-muted);
     font-family: 'DM Mono', monospace;
@@ -290,7 +305,7 @@
   .cbd-bar-fill { height: 100%; border-radius: 5px; transition: width 0.8s ease; }
   .cbd-pct { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--ink-muted); width: 28px; text-align: right; }
 
-  /* ═══ CONSTELLATION TIMEFRAME BUTTONS ═══ */
+  /* --- CONSTELLATION TIMEFRAME BUTTONS --- */
   .constellation-tf { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
   .ctf-btn {
     padding: 3px 10px; border-radius: 100px; font-size: 9px; letter-spacing: 0.06em;
@@ -301,7 +316,7 @@
   .ctf-btn.active { background: var(--gold); border-color: var(--gold); color: var(--ink); }
   .ctf-btn:hover:not(.active) { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.65); }
 
-  /* ═══ ADD MOMENT MODAL ═══ */
+  /* --- ADD MOMENT MODAL --- */
   .moment-modal-overlay {
     position: fixed; inset: 0; background: rgba(26,23,20,0.55); z-index: 2100;
     display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
@@ -328,7 +343,7 @@
   body.dark .moment-modal { background: #1C1917; border-color: #2A2522; }
   body.dark .moment-textarea { background: #141210; border-color: #2A2522; color: var(--ink); }
 
-  /* ═══ ADD PEER MODAL ═══ */
+  /* --- ADD PEER MODAL --- */
   .peer-modal-overlay {
     position: fixed; inset: 0; background: rgba(26,23,20,0.55); z-index: 2100;
     display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
@@ -360,7 +375,7 @@
   body.dark .peer-modal { background: #1C1917; border-color: #2A2522; }
   body.dark .peer-option { background: #141210; border-color: #2A2522; }
 
-  /* ═══ AUTH SCREEN ═══ */
+  /* --- AUTH SCREEN --- */
   .auth-screen {
     position: fixed; inset: 0; background: var(--cream); z-index: 4000;
     display: flex; align-items: center; justify-content: center;
@@ -407,7 +422,7 @@
   .auth-skip { text-align: center; margin-top: 10px; }
   .auth-skip-btn { background: none; border: none; color: var(--ink-muted); font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; text-decoration: underline; }
 
-  /* ═══ PROFILE MODAL ═══ */
+  /* --- PROFILE MODAL --- */
   .profile-modal-overlay {
     position: fixed; inset: 0; background: rgba(26,23,20,0.55); z-index: 2100;
     display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
@@ -437,7 +452,7 @@
   .profile-avatar-upload:hover .profile-avatar-overlay { opacity: 1; }
   body.dark .profile-modal { background: #1C1917; border-color: #2A2522; }
 
-  /* ═══ EXPORT / IMPORT BUTTONS ═══ */
+  /* --- EXPORT / IMPORT BUTTONS --- */
   .data-actions { display: flex; gap: 10px; margin-bottom: 16px; }
   .data-btn {
     flex: 1; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--cream-dark);
@@ -449,7 +464,7 @@
   .data-btn.import-btn:hover { background: var(--sage); color: white; }
   body.dark .data-btn { background: #1C1917; border-color: #2A2522; }
 
-  /* ═══ SMART METRIC INDICATOR ═══ */
+  /* --- SMART METRIC INDICATOR --- */
   .smart-detected {
     display: flex; align-items: center; gap: 6px; padding: 7px 11px;
     background: rgba(107,140,122,0.1); border: 1px solid rgba(107,140,122,0.25);
@@ -457,7 +472,7 @@
   }
   .smart-detected-icon { font-size: 13px; }
 
-  /* ═══ TOAST ENHANCED ═══ */
+  /* --- TOAST ENHANCED --- */
   .toast-success { background: var(--ink); }
   .toast-error { background: var(--rose) !important; }
   .toast-achievement { background: linear-gradient(135deg, #1A1714, #3D3020) !important; border: 1px solid var(--gold) !important; }
@@ -551,6 +566,7 @@
     }
 
     .page-title { font-size: 26px; }
+    .page-title-brand { font-size: clamp(32px, 8vw, 40px); }
     .btn { padding: 9px 14px; font-size: 12px; }
 
     .momentum-banner {
@@ -679,6 +695,7 @@
     .center-panel,
     .right-panel { padding: 16px 8px 88px; }
     .page-title { font-size: 24px; }
+    .page-title-brand { font-size: clamp(30px, 10vw, 36px); }
     .page-greeting { font-size: 10px; }
     .header-actions {
       flex-wrap: wrap;
@@ -727,17 +744,13 @@
 
     .always-head,
     .always-body { padding-left: 14px; padding-right: 14px; }
-    .always-title { font-size: 14px; }
-    .always-head {
-      gap: 8px;
+    .always-date-heading { font-size: 20px; }
+    .always-head { gap: 8px; }
+    .always-head-top {
+      width: 100%;
       flex-wrap: wrap;
-      align-items: flex-start;
     }
-    .always-datetag {
-      max-width: 100%;
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
+    .always-day-progress { width: 100%; align-items: flex-start; }
 
     .log-glance-pill {
       max-width: 100%;
@@ -759,6 +772,26 @@
       align-items: stretch;
     }
     .add-task-btn { width: 100%; }
+    .always-date-nav {
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .always-intention-schedule-row,
+    .always-intention-actions {
+      flex-direction: column;
+    }
+    .always-intention-kind {
+      width: 100%;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .always-custom-schedule-btn {
+      width: 100%;
+      min-height: 34px;
+      font-size: 12px;
+    }
+    .always-intention-cancel,
+    .always-intention-save { width: 100%; }
 
     .modal-overlay,
     .moment-modal-overlay,
@@ -824,11 +857,12 @@
     .center-panel,
     .right-panel { padding-left: 6px; padding-right: 6px; }
     .page-title { font-size: 22px; }
+    .page-title-brand { font-size: clamp(28px, 11vw, 34px); }
     .btn { font-size: 11px; padding: 8px 12px; }
 
-    .cal-stat-block { padding: 10px 10px; }
-    .cal-stat-val { font-size: 18px; }
-    .cal-stat-label { font-size: 9px; }
+    .cal-stat-block { padding: 10px 8px; min-width: 0; }
+    .cal-stat-val { font-size: 18px; line-height: 1.18; }
+    .cal-stat-label { font-size: 9px; letter-spacing: 0.05em; }
     .cal-header { margin-bottom: 10px; }
     .cal-goal-pill,
     .cal-cat-pill {
@@ -847,8 +881,8 @@
 
     .always-head,
     .always-body { padding-left: 12px; padding-right: 12px; }
-    .always-title { font-size: 13px; }
-    .always-datetag { font-size: 9px; }
+    .always-date-heading { font-size: 18px; }
+    .always-day-progress-text { font-size: 9px; }
     .at-text { font-size: 11px; }
 
     .modal,
@@ -862,6 +896,7 @@
 
   @media (max-width: 380px) {
     .page-title { font-size: 20px; }
+    .page-title-brand { font-size: clamp(26px, 11vw, 32px); }
     .cal-month { font-size: 19px; }
     .cal-arrow { width: 28px; height: 28px; }
     .cal-cell { min-height: 40px; }

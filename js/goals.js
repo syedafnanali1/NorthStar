@@ -362,12 +362,13 @@ function toggleGoalSub(goalId, subId, el){
   const s = g.subs.find(s=>s.id===subId); if(!s) return;
   s.done = !s.done;
   el.classList.toggle('sub-done');
-  el.querySelector('.sub-chk').textContent = s.done ? '✓' : '';
+  el.querySelector('.sub-chk').textContent = s.done ? '?' : '';
   const autoChanged = applyAutoMetricForGoalSub(goalId, subId, s.done, TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
+  setPersonalIntentionCheckedByText(s.text, TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day, s.done);
   syncIntentionsToCalendar();
   renderAlwaysPanel();
   if(autoChanged) rerenderGoalsKeepExpanded(goalId);
-  if(s.done) showToast('✓ Intention complete. Linked to calendar.');
+  if(s.done) showToast('? Intention complete. Linked to calendar.');
 }
 
 function showSubAdder(goalId, btn){
@@ -407,7 +408,7 @@ function saveSubAdder(goalId){
 // ── Log metric from goal card ─────────────────────────────────
 function logMetric(goalId){
   const g = GOALS.find(g=>g.id===goalId); if(!g) return;
-  if(goalUsesAutoTracking(g)){ showToast('ðŸ¤– This goal is auto-tracked from linked intentions.'); return; }
+  if(goalUsesAutoTracking(g)){ showToast('This goal is auto-tracked from linked intentions.'); return; }
   const inp = document.getElementById('mi-'+goalId); if(!inp) return;
   const val = parseFloat(inp.value);
   if(!val||val<=0){ showToast('Enter a value first.'); return; }
@@ -424,7 +425,7 @@ function logMetric(goalId){
 // ── Log metric from daily log panel ──────────────────────────
 function logDayMetric(goalId, key){
   const g = GOALS.find(g=>g.id===goalId); if(!g) return;
-  if(goalUsesAutoTracking(g)){ showToast('ðŸ¤– This goal is auto-tracked from linked intentions.'); return; }
+  if(goalUsesAutoTracking(g)){ showToast('This goal is auto-tracked from linked intentions.'); return; }
   const inp = document.getElementById('lgr-'+goalId); if(!inp) return;
   const val = parseFloat(inp.value);
   if(!val||val<=0){ showToast('Enter a value first.'); return; }
@@ -487,100 +488,223 @@ function renderCalGoalStrip(){
   });
 }
 
-// ── Always-on panel: today's intentions + goal sub-tasks ─────
+// Always-on panel: date + intentions + collapsible goal tasks
+let alwaysExpandedGoalId = null;
+let motivationRotateTimer = null;
+let activeMotivationQuote = '';
+
+function pickMotivationQuote(){
+  const src = (typeof QUOTES !== 'undefined' && Array.isArray(QUOTES) && QUOTES.length)
+    ? QUOTES
+    : [
+        'Small actions repeated become identity.',
+        'Focus on this step. The next step appears after.',
+        'Consistency beats intensity when practiced daily.'
+      ];
+  const pool = src.filter(q => q !== activeMotivationQuote);
+  const next = (pool.length ? pool : src)[Math.floor(Math.random() * (pool.length ? pool.length : src.length))];
+  activeMotivationQuote = next;
+  return next;
+}
+
+function startMotivationRotation(){
+  if(!activeMotivationQuote) pickMotivationQuote();
+  if(motivationRotateTimer) return;
+  motivationRotateTimer = setInterval(() => {
+    const el = document.getElementById('always-motivation-quote');
+    if(!el) return;
+    el.textContent = pickMotivationQuote();
+  }, 20000);
+}
+
+function stopMotivationRotation(){
+  if(motivationRotateTimer){
+    clearInterval(motivationRotateTimer);
+    motivationRotateTimer = null;
+  }
+}
+
+function toggleAlwaysGoalSection(goalId, yr, mo, dy){
+  alwaysExpandedGoalId = alwaysExpandedGoalId === goalId ? null : goalId;
+  const yy = Number.isInteger(yr) ? yr : (selectedYear ?? calYear ?? TODAY_CAL.year);
+  const mm = Number.isInteger(mo) ? mo : (selectedMonth ?? calMonth ?? TODAY_CAL.month);
+  const dd = Number.isInteger(dy) ? dy : (selectedDate ?? TODAY_CAL.day);
+  renderAlwaysPanel(yy, mm, dd);
+}
+
 function renderAlwaysPanel(yr, mo, dy){
-  yr = yr||calYear||TODAY_CAL.year; mo = mo||calMonth||TODAY_CAL.month; dy = dy||(selectedDate||TODAY_CAL.day);
-  const body = document.getElementById('always-body'); if(!body) return;
-  const tag  = document.getElementById('always-datetag');
+  yr = yr || calYear || TODAY_CAL.year;
+  mo = mo || calMonth || TODAY_CAL.month;
+  dy = dy || (selectedDate || TODAY_CAL.day);
+
+  const body = document.getElementById('always-content') || document.getElementById('always-body');
+  if(!body) return;
+
+  const heading = document.getElementById('log-date-heading');
+  const sub = document.getElementById('log-sub');
   const isToday = isTodayDate(yr, mo, dy);
   const d = new Date(yr, mo, dy);
-  const dateLabel = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  if(tag) tag.textContent = dateLabel + (isToday?' · Today':'');
-  // Update panel title
-  const titleEl = document.querySelector('.always-title');
-  if(titleEl) titleEl.textContent = isToday ? "Today's Intentions" : `${dateLabel} — Intentions`;
+  const longDateLabel = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+  if(heading) heading.textContent = longDateLabel;
+  const picker = document.getElementById('always-day-picker');
+  if(picker) picker.value = toDateInputValue(yr, mo, dy);
+  if(sub) sub.textContent = 'Log your progress, check intentions & leave a reflection.';
 
   const key = `${yr}-${mo}-${dy}`;
   const sections = [];
 
-  // ── 1) Personal intentions ──────────────────────────────────
-  let intentionsSrc;
-  if(isToday){
-    intentionsSrc = intentionsStore;
-  } else {
-    const logTasks = (dayLogs[key]||{}).tasks || [];
-    intentionsSrc = logTasks.filter(t => !t._fromGoal).map(t=>({
-      text: t.text, done: t.checked,
-      color: t.badgeColor||'var(--ink-muted)', label: t.badge
-    }));
-  }
+  const personalRows = getPersonalIntentionRowsForDate(yr, mo, dy, true);
+  const adderOpen = !!intentionAdderContext?.open && intentionAdderContext?.yr === yr && intentionAdderContext?.mo === mo && intentionAdderContext?.dy === dy;
+  const adderMode = ['daily', 'day', 'alternate', 'weekly', 'custom'].includes(intentionAdderContext?.mode) ? intentionAdderContext.mode : 'day';
+  const customDays = Array.isArray(intentionAdderContext?.customDays) && intentionAdderContext.customDays.length
+    ? intentionAdderContext.customDays.map(n => Number(n)).filter(n => n >= 0 && n <= 6)
+    : [new Date(yr, mo, dy).getDay()];
+  const customIntervalWeeks = [1, 2, 4].includes(Number(intentionAdderContext?.customIntervalWeeks))
+    ? Number(intentionAdderContext.customIntervalWeeks)
+    : 1;
 
-  const intItems = intentionsSrc.map((t, i)=>{
-    const done = t.done !== undefined ? t.done : !!t.checked;
-    const badge = t.label || t.badge || '';
-    const bgColor = resolveCssVar(t.color||t.badgeColor||'#8C857D');
-    const clickFn = isToday
-      ? `alwaysToggleIntention(${i},this,true)`
-      : `alwaysTogglePastTask(this,'${yr}','${mo}','${dy}',${i})`;
-    return `<div class="always-task${done?' at-done':''}" onclick="${clickFn}">
-      <div class="at-chk">${done?'✓':''}</div>
+  const personalItems = personalRows.map(t => {
+    return `<div class="always-task${t.checked ? ' at-done' : ''}" onclick="alwaysToggleIntention('${t.id}',${yr},${mo},${dy})">
+      <div class="at-chk">${t.checked ? '&#10003;' : ''}</div>
       <div class="at-text">${t.text}</div>
-      ${badge ? `<span class="at-badge" style="background:${bgColor}">${badge}</span>` : ''}
     </div>`;
   }).join('');
 
+  const dayPickerButtons = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    .map((label, idx) => `<button class="always-custom-day${customDays.includes(idx) ? ' sel' : ''}" type="button" onclick="toggleIntentionCustomDay(${idx})">${label}</button>`)
+    .join('');
+
+  const addPrompt = adderOpen
+    ? `<div class="always-intention-adder">
+        <input id="always-intention-input" class="always-intention-input" type="text" placeholder="What do you want to do?" onkeydown="if(event.key==='Enter')addIntention()">
+        <div class="always-intention-schedule-row">
+          <div class="always-intention-kind">
+            <button class="always-kind-btn${adderMode==='daily' ? ' sel' : ''}" type="button" onclick="setIntentionAdderMode('daily')">Every day</button>
+            <button class="always-kind-btn${adderMode==='day' ? ' sel' : ''}" type="button" onclick="setIntentionAdderMode('day')">Just this day</button>
+            <button class="always-kind-btn${adderMode==='alternate' ? ' sel' : ''}" type="button" onclick="setIntentionAdderMode('alternate')">Alternate day</button>
+            <button class="always-kind-btn${adderMode==='weekly' ? ' sel' : ''}" type="button" onclick="setIntentionAdderMode('weekly')">Weekly</button>
+          </div>
+          <button class="always-custom-schedule-btn${adderMode==='custom' ? ' sel' : ''}" type="button" onclick="toggleIntentionCustomSchedule()" aria-label="Custom schedule">📅</button>
+        </div>
+        ${adderMode === 'custom'
+          ? `<div class="always-custom-schedule-panel">
+              <div class="always-custom-int-label">Repeat On</div>
+              <div class="always-custom-days">${dayPickerButtons}</div>
+              <div class="always-custom-int-label">Frequency</div>
+              <div class="always-custom-interval">
+                <button class="always-custom-interval-btn${customIntervalWeeks===1 ? ' sel' : ''}" type="button" onclick="setIntentionCustomInterval(1)">Every week</button>
+                <button class="always-custom-interval-btn${customIntervalWeeks===2 ? ' sel' : ''}" type="button" onclick="setIntentionCustomInterval(2)">Every 2 weeks</button>
+                <button class="always-custom-interval-btn${customIntervalWeeks===4 ? ' sel' : ''}" type="button" onclick="setIntentionCustomInterval(4)">Every 4 weeks</button>
+              </div>
+            </div>`
+          : ''}
+        <div class="always-intention-actions">
+          <button class="always-intention-save" type="button" onclick="addIntention()">Add intention</button>
+          <button class="always-intention-cancel" type="button" onclick="closeIntentionAdder()">Cancel</button>
+        </div>
+      </div>`
+    : '';
+
   sections.push(`<div class="always-section">
     <div class="always-sec-hdr">
-      <div class="always-sec-lbl">Daily Intentions</div>
+      <div class="always-sec-lbl always-intentions-lbl">${isToday ? "Today's Intentions" : 'Intentions'}</div>
       <button class="always-add-btn" onclick="openIntentionAdder(${yr},${mo},${dy})">+ Add</button>
     </div>
-    ${intItems || `<div class="at-empty">No intentions yet — <button onclick="openIntentionAdder(${yr},${mo},${dy})" style="color:var(--gold);background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;padding:0">add one now</button></div>`}
+    ${personalItems || `<div class="at-empty">No intentions for this day yet.</div>`}
+    ${addPrompt}
   </div>`);
 
-  // ── 2) Goal sub-tasks active on this specific day ──────────
-  const activeGoals = GOALS.filter(g => goalActiveOnDay(g, yr, mo, dy));
-  activeGoals.forEach(g => {
-    if(!g.subs.length) return;
-    const savedTasks = (dayLogs[key]||{}).tasks || [];
+  const activeGoals = GOALS.filter(g => goalActiveOnDay(g, yr, mo, dy) && g.subs.length);
+  if(alwaysExpandedGoalId && !activeGoals.some(g => g.id === alwaysExpandedGoalId)){
+    alwaysExpandedGoalId = null;
+  }
 
-    const items = g.subs.map(s => {
-      const saved = savedTasks.find(t => t._fromGoal===g.id && t.text===s.text);
-      // For today use s.done; for past days use saved state
-      const done = isToday ? s.done : (saved ? saved.checked : false);
-      return `<div class="always-task${done?' at-done':''}" onclick="alwaysToggleGoalSub(this,'${g.id}','${s.id}',${yr},${mo},${dy})">
-        <div class="at-chk">${done?'✓':''}</div>
-        <div class="at-text">${s.text}</div>
-        <span class="at-badge" style="background:${g.hex}">${g.name}</span>
+  let pendingGoalCount = 0;
+  if(activeGoals.length){
+    const goalBlocks = activeGoals.map(g => {
+      const savedTasks = (dayLogs[key] || {}).tasks || [];
+      let doneCount = 0;
+
+      const rows = g.subs.map(s => {
+        const saved = savedTasks.find(t => t._fromGoal === g.id && (t._subId === s.id || textsMatch(t.text, s.text)));
+        const done = isToday ? !!s.done : !!saved?.checked;
+        if(done) doneCount++;
+        return { sub:s, done };
+      });
+
+      const pendingRows = rows.filter(r => !r.done);
+      pendingGoalCount += pendingRows.length;
+
+      const items = pendingRows.map(r => {
+        const s = r.sub;
+        return `<div class="always-task" onclick="alwaysToggleGoalSub(this,'${g.id}','${s.id}',${yr},${mo},${dy})">
+          <div class="at-chk"></div>
+          <div class="at-text">${s.text}</div>
+          <span class="at-badge" style="background:${g.hex}">${g.name}</span>
+        </div>`;
+      }).join('');
+
+      const dayDelta = g.entries
+        .filter(e => e.date === key)
+        .reduce((sum, e) => sum + (e.val || 0), 0);
+      const pct = goalPct(g);
+      const isExpanded = alwaysExpandedGoalId === g.id;
+      const progressBar = `<div class="always-metric-bar">
+        <div style="height:3px;flex:1;background:var(--cream-dark);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${g.hex};transition:width 0.5s ease"></div>
+        </div>
+        <span style="font-size:9px;font-family:'DM Mono',monospace;color:${g.hex};font-weight:600;white-space:nowrap">
+          ${fmtMetric(g.current,g.unit)} / ${fmtMetric(g.target,g.unit)}
+          ${dayDelta ? ` · <span style="color:#6B8C7A">+${fmtMetric(dayDelta,g.unit)} today</span>` : ''}
+        </span>
+      </div>`;
+
+      return `<div class="always-goal-block${isExpanded ? ' expanded' : ''}">
+        <button class="always-goal-toggle" type="button" onclick="toggleAlwaysGoalSection('${g.id}',${yr},${mo},${dy})" aria-expanded="${isExpanded ? 'true' : 'false'}">
+          <div class="always-goal-main">
+            <span class="always-goal-dot" style="background:${g.hex}"></span>
+            <span class="always-goal-name">${CAT_META[g.cat]?.icon || '*'} ${g.name}</span>
+          </div>
+          <span class="always-goal-meta">${doneCount}/${g.subs.length}</span>
+          <span class="always-goal-chevron">${isExpanded ? '-' : '+'}</span>
+        </button>
+        <div class="always-goal-items">
+          ${items || `<div class='at-empty' style='padding:10px 2px'>All goal intentions complete.</div>`}
+          ${progressBar}
+        </div>
       </div>`;
     }).join('');
 
-    // Progress mini-bar for this goal on this day
-    const dayDelta = g.entries.filter(e=>e.date===key).reduce((sum,e)=>sum + (e.val||0), 0);
-    const pct = goalPct(g);
-    const progressBar = `<div class="always-metric-bar">
-      <div style="height:3px;flex:1;background:var(--cream-dark);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${g.hex};transition:width 0.5s ease"></div>
-      </div>
-      <span style="font-size:9px;font-family:'DM Mono',monospace;color:${g.hex};font-weight:600;white-space:nowrap">
-        ${fmtMetric(g.current,g.unit)} / ${fmtMetric(g.target,g.unit)}
-        ${dayDelta ? ` · <span style="color:#6B8C7A">+${fmtMetric(dayDelta,g.unit)} today</span>` : ''}
-      </span>
-    </div>`;
-
     sections.push(`<div class="always-section">
       <div class="always-sec-hdr">
-        <div class="always-sec-lbl">${CAT_META[g.cat]?.icon||'⭐'} ${g.name} <span style="font-family:'DM Mono',monospace;font-size:9px;opacity:0.45">${pct}%</span></div>
+        <div class="always-sec-lbl">Goal Intentions</div>
       </div>
-      ${items}
-      ${progressBar}
+      <div class="always-goals-list">${goalBlocks}</div>
     </div>`);
-  });
+  }
 
-  if(!intentionsSrc.length && !activeGoals.some(g=>g.subs.length)){
-    sections.push(`<div class="at-empty" style="padding:4px 0;text-align:center;color:var(--ink-muted)">Nothing to show for this day.</div>`);
+  if(!personalRows.length && pendingGoalCount === 0){
+    pickMotivationQuote();
+    sections.push(`<div class="always-section always-motivation-wrap">
+      <div class="always-sec-hdr">
+        <div class="always-sec-lbl always-intentions-lbl">${isToday ? "Today's Motivation" : 'Motivation'}</div>
+      </div>
+      <div class="always-motivation-quote" id="always-motivation-quote">${activeMotivationQuote}</div>
+    </div>`);
+    startMotivationRotation();
+  } else {
+    stopMotivationRotation();
   }
 
   body.innerHTML = sections.join('');
+
+  if(adderOpen){
+    setTimeout(() => {
+      const input = document.getElementById('always-intention-input');
+      if(input) input.focus();
+    }, 0);
+  }
 }
 
 // Whether a goal is active on a specific day (stricter than month check)
@@ -591,96 +715,92 @@ function goalActiveOnDay(g, yr, mo, dy){
   return gS <= dayDate && gE >= dayDate;
 }
 
-function alwaysToggleIntention(idx, el, isToday){
-  if(isToday && intentionsStore[idx]){
-    intentionsStore[idx].done = !intentionsStore[idx].done;
-    el.classList.toggle('at-done');
-    el.querySelector('.at-chk').textContent = intentionsStore[idx].done ? '✓' : '';
+function alwaysToggleIntention(intentId, yr, mo, dy){
+  const yy = parseInt(yr, 10);
+  const mm = parseInt(mo, 10);
+  const dd = parseInt(dy, 10);
+  const key = `${yy}-${mm}-${dd}`;
 
-    const autoChanged = applyAutoMetricForIntentionText(intentionsStore[idx].text, intentionsStore[idx].done, TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
+  const rows = getPersonalIntentionRowsForDate(yy, mm, dd, true);
+  const row = rows.find(r => r.id === intentId);
+  if(!row) return;
 
-    // Mirror to right panel
-    const rpItems = document.querySelectorAll('#intentions-list .intention-item');
-    rpItems.forEach(rp=>{
-      if(rp.querySelector('.intention-text')?.textContent===intentionsStore[idx].text){
-        intentionsStore[idx].done ? rp.classList.add('done') : rp.classList.remove('done');
-        rp.querySelector('.intention-check').textContent = intentionsStore[idx].done?'✓':'';
-      }
-    });
+  const next = !row.checked;
+  setPersonalIntentionChecked(intentId, yy, mm, dd, next);
+  const goalSyncChanged = syncGoalSubsFromPersonalText(row.text, next, yy, mm, dd);
+  const autoChanged = applyAutoMetricForIntentionText(row.text, next, yy, mm, dd);
 
-    syncIntentionsToCalendar();
-    if(autoChanged) rerenderGoalsKeepExpanded();
-  }
-}
-
-// Toggle an intention from a past day's panel
-function alwaysTogglePastTask(el, yr, mo, dy, idx){
-  const key = `${yr}-${mo}-${dy}`;
-  if(!dayLogs[key]) return;
-  const tasks = dayLogs[key].tasks.filter(t=>!t._fromGoal);
-  if(!tasks[idx]) return;
-  tasks[idx].checked = !tasks[idx].checked;
-  el.classList.toggle('at-done');
-  const yy = parseInt(yr,10), mm = parseInt(mo,10), dd = parseInt(dy,10);
-  const autoChanged = applyAutoMetricForIntentionText(tasks[idx].text, tasks[idx].checked, yy, mm, dd);
   buildCalendar();
   renderAlwaysPanel(yy, mm, dd);
-  if(autoChanged) rerenderGoalsKeepExpanded();
-  el.querySelector('.at-chk').textContent = tasks[idx].checked ? '✓' : '';
-}
-
-// Toggle a goal sub-task from the always panel (any day)
-function alwaysToggleGoalSub(el, goalId, subId, yr, mo, dy){
-  const g = GOALS.find(g=>g.id===goalId); if(!g) return;
-  const s = g.subs.find(s=>s.id===subId); if(!s) return;
-  const isToday = isTodayDate(yr, mo, dy);
-  el.classList.toggle('at-done');
-  const isDone = el.classList.contains('at-done');
-  el.querySelector('.at-chk').textContent = isDone ? '✓' : '';
-  const autoChanged = applyAutoMetricForGoalSub(goalId, subId, isDone, yr, mo, dy);
-  if(isToday) s.done = isDone;
-  // Persist to dayLog
-  const key = `${yr}-${mo}-${dy}`;
-  if(!dayLogs[key]) dayLogs[key] = { mood:'', sleep:'', note:'', tasks:[] };
-  const existing = dayLogs[key].tasks.find(t=>t._fromGoal===goalId && t.text===s.text);
-  if(existing){ existing.checked = isDone; }
-  else { dayLogs[key].tasks.push({text:s.text, checked:isDone, badge:g.name, badgeColor:g.hex, _fromGoal:goalId}); }
-  buildCalendar();
-  // Re-select the cell
-  const allCells = document.querySelectorAll('.cal-grid .cal-cell:not(.other-month)');
-  if(allCells[dy-1]) allCells[dy-1].classList.add('selected');
-  if(autoChanged) rerenderGoalsKeepExpanded(goalId);
-  if(isDone) showToast(`✓ ${s.text.slice(0,40)}`);
-}
-
-// ── Log panel: goal metric inputs ─────────────────────────────
-function renderLogGoalMetrics(yr, mo, dy){
-  const cont = document.getElementById('log-goal-metrics'); if(!cont) return;
-  const active = GOALS.filter(g => goalActiveInMonth(g, yr, mo));
-  if(!active.length){ cont.innerHTML=''; return; }
-
-  const manualGoals = active.filter(g => !goalUsesAutoTracking(g));
-  if(!manualGoals.length){
-    cont.innerHTML = `<div class="log-section-title">Goal Progress for This Day</div><div class="log-goal-row"><div class="lgr-name">🤖 Auto-tracked Goals</div><div class="lgr-stat">Linked metric intentions update progress automatically. No manual entry needed.</div></div>`;
-    return;
+  renderDayGlance(yy, mm, dd, getPersonalIntentionRowsForDate(yy, mm, dd, false), buildGoalLinkedIntentionRows(dayLogs[key], GOALS.filter(g => goalActiveOnDay(g, yy, mm, dd))));
+  if(yy === TODAY_CAL.year && mm === TODAY_CAL.month && dd === TODAY_CAL.day){
+    updateRightPanelIntentions(intentId, next);
+  } else {
+    renderRightPanelIntentions();
   }
 
-  const key = `${yr}-${mo}-${dy}`;
-  cont.innerHTML = `<div class="log-section-title">Goal Progress for This Day</div>` +
-    manualGoals.map(g => {
-      const cat = CAT_META[g.cat]||CAT_META.custom;
-      const existing = g.entries.find(e=>e.date===key && !e.auto);
-      return `<div class="log-goal-row">
-        <div class="lgr-name"><span>${cat.icon}</span>${g.name} <span style="font-size:10px;color:var(--ink-muted);font-weight:400">${goalPct(g)}%</span></div>
-        <div class="lgr-stat">${fmtMetric(g.current,g.unit)} / ${fmtMetric(g.target,g.unit)}${existing?` · <span style="color:#6B8C7A;font-weight:600">+${fmtMetric(existing.val,g.unit)} today</span>`:''}</div>
-        <div class="lgr-inputs">
-          <input class="lgr-input" type="number" min="0" id="lgr-${g.id}" placeholder="${g.unit==='$'?'300':'8'}" value="${existing?existing.val:''}">
-          <span class="lgr-unit">${g.unit}</span>
-          <button class="lgr-btn" onclick="logDayMetric('${g.id}','${key}')">Log</button>
-        </div>
-        <span class="lgr-logged" id="lgr-lbl-${g.id}" style="display:${existing?'block':'none'}">${existing?`✓ ${fmtMetric(existing.val,g.unit)} logged`:''}</span>
-      </div>`;
-    }).join('');
+  const allCells = document.querySelectorAll('.cal-grid .cal-cell:not(.other-month)');
+  if(allCells[dd-1]) allCells[dd-1].classList.add('selected');
+
+  if(goalSyncChanged || autoChanged) rerenderGoalsKeepExpanded();
+  if(next) showToast(`? ${row.text.slice(0,40)}`);
+}
+
+// Legacy index-based fallback.
+function alwaysTogglePastTask(el, yr, mo, dy, idx){
+  const yy = parseInt(yr,10), mm = parseInt(mo,10), dd = parseInt(dy,10);
+  const rows = getPersonalIntentionRowsForDate(yy, mm, dd, true);
+  const row = rows[idx];
+  if(row) alwaysToggleIntention(row.id, yy, mm, dd);
+}
+
+function alwaysToggleGoalSub(el, goalId, subId, yr, mo, dy){
+  const g = GOALS.find(goal => goal.id === goalId); if(!g) return;
+  const s = g.subs.find(sub => sub.id === subId); if(!s) return;
+  const yy = parseInt(yr,10), mm = parseInt(mo,10), dd = parseInt(dy,10);
+  const key = `${yy}-${mm}-${dd}`;
+  const isToday = isTodayDate(yy, mm, dd);
+
+  const existing = (dayLogs[key]?.tasks || []).find(t => t._fromGoal === goalId && (t._subId === subId || textsMatch(t.text, s.text)));
+  const currentDone = isToday ? !!s.done : !!existing?.checked;
+  const isDone = !currentDone;
+
+  const autoChanged = applyAutoMetricForGoalSub(goalId, subId, isDone, yy, mm, dd);
+  if(isToday) s.done = isDone;
+
+  const log = ensureDayLogEntry(key);
+  const goalTask = log.tasks.find(t => t._fromGoal === goalId && (t._subId === subId || textsMatch(t.text, s.text)));
+  if(goalTask) goalTask.checked = isDone;
+  else log.tasks.push({ text:s.text, checked:isDone, badge:g.name, badgeColor:g.hex, _fromGoal:goalId, _subId:subId });
+
+  setPersonalIntentionCheckedByText(s.text, yy, mm, dd, isDone);
+
+  buildCalendar();
+  alwaysExpandedGoalId = goalId;
+  renderAlwaysPanel(yy, mm, dd);
+  renderDayGlance(yy, mm, dd, getPersonalIntentionRowsForDate(yy, mm, dd, false), buildGoalLinkedIntentionRows(dayLogs[key], GOALS.filter(goal => goalActiveOnDay(goal, yy, mm, dd))));
+  if(yy === TODAY_CAL.year && mm === TODAY_CAL.month && dd === TODAY_CAL.day){
+    const matchedTodayIds = getPersonalIntentionRowsForDate(yy, mm, dd, true)
+      .filter(r => textsMatch(r.text, s.text))
+      .map(r => r.id);
+    if(matchedTodayIds.length){
+      matchedTodayIds.forEach(id => updateRightPanelIntentions(id, isDone));
+    } else {
+      renderRightPanelIntentions();
+    }
+  } else {
+    renderRightPanelIntentions();
+  }
+
+  const allCells = document.querySelectorAll('.cal-grid .cal-cell:not(.other-month)');
+  if(allCells[dd-1]) allCells[dd-1].classList.add('selected');
+
+  if(autoChanged) rerenderGoalsKeepExpanded(goalId);
+  if(isDone) showToast(`? ${s.text.slice(0,40)}`);
+}
+function renderLogGoalMetrics(yr, mo, dy){
+  const cont = document.getElementById('log-goal-metrics');
+  if(cont) cont.innerHTML = '';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -814,3 +934,4 @@ function selectColor(el){ document.querySelectorAll('.color-opt').forEach(c=>c.c
 
 
 // ─── COMPOUND VIEW ───────────────────────────────────────────
+

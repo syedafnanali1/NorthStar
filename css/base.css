@@ -196,6 +196,8 @@
   .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
   .page-greeting { font-size: 11px; color: var(--ink-muted); letter-spacing: 0.09em; text-transform: uppercase; font-weight: 500; margin-bottom: 4px; }
   .page-title { font-family: 'Playfair Display', serif; font-size: 29px; font-weight: 600; color: var(--ink); line-height: 1.1; }
+  .page-title-brand { font-size: clamp(36px, 4.6vw, 52px); letter-spacing: -0.01em; margin-bottom: 4px; }
+  .page-subtitle { font-size: 12px; color: var(--ink-muted); font-style: italic; }
   .header-actions { display: flex; gap: 10px; }
 
   .btn { padding: 10px 20px; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s ease; }
@@ -208,12 +210,12 @@
   .momentum-banner { background: linear-gradient(135deg, #F8F2E7 0%, #F5EEE0 100%); border: 1.5px solid rgba(196,150,58,0.35); border-radius: 20px; padding: 22px 26px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; position: relative; overflow: hidden; animation: slideUp 0.5s ease both; }
   .momentum-banner::after { content: ''; position: absolute; right: -30px; top: -40px; width: 180px; height: 180px; border-radius: 50%; border: 1px solid rgba(196,150,58,0.22); }
   .momentum-left { flex: 1; }
-  .momentum-main { display: flex; align-items: center; gap: 18px; margin-top: 8px; }
+  .momentum-main { display: flex; align-items: center; gap: 18px; margin-top: 8px; min-width: 0; flex-wrap: wrap; }
   .momentum-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); font-weight: 600; margin-bottom: 5px; opacity: 1; }
   .momentum-score { display: flex; align-items: baseline; gap: 7px; }
   .momentum-num { font-family: 'Playfair Display', serif; font-size: 46px; color: white; line-height: 1; }
   .momentum-unit { font-size: 13px; color: var(--gold-light); opacity: 0.6; }
-  .momentum-desc { font-size: 12px; color: rgba(26,23,20,0.7); margin-top: 5px; max-width: 210px; line-height: 1.55; }
+  .momentum-desc { font-size: 12px; color: rgba(26,23,20,0.7); margin-top: 5px; max-width: 320px; line-height: 1.55; }
   .momentum-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 1; }
   .momentum-bars { display: flex; align-items: flex-end; gap: 4px; height: 42px; }
   .m-bar { width: 8px; border-radius: 4px; background: rgba(26,23,20,0.2); }

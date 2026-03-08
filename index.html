@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>North Star — Goal Tracker</title>
+  <title>NorthStar — Goal Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
   <!-- Styles: split into base → components → features -->
@@ -23,9 +23,9 @@
     <circle cx="22" cy="22" r="4" fill="#C4963A"/>
   </svg>
 
-  <div class="splash-label">North Star</div>
-  <div class="splash-headline">Small actions,<br>extraordinary results.</div>
-  <div class="splash-sub">What 1% daily improvement looks like over time</div>
+  <div class="splash-label">Goal Tracker</div>
+  <div class="splash-headline">NorthStar</div>
+  <div class="splash-sub">Small actions. Extraordinary results.</div>
 
   <div class="splash-chart-wrap">
     <canvas id="splash-canvas"></canvas>
@@ -54,10 +54,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span class="nav-tip">Daily Log</span>
     </div>
-    <div class="nav-icon" onclick="showCompound()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      <span class="nav-tip">1% View</span>
-    </div>
     <div class="nav-icon" onclick="switchView('circle',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="nav-tip">Circle</span>
@@ -84,11 +80,11 @@
       <div class="page-view active" id="view-goals">
         <div class="page-header">
           <div>
-            <div class="page-greeting">Sunday, February 22</div>
-            <h1 class="page-title">Your North Stars</h1>
+            <div class="page-greeting">Welcome to</div>
+            <h1 class="page-title page-title-brand">NorthStar</h1>
+            <div class="page-subtitle">Your North Stars</div>
           </div>
           <div class="header-actions">
-            <button class="btn btn-ghost" onclick="showCompound()">The 1% View</button>
             <button class="btn btn-primary" onclick="openModal()">+ New Goal</button>
           </div>
         </div>
@@ -205,71 +201,63 @@
         </div>
         <div class="cal-grid" id="cal-grid"></div>
 
-        <!-- ALWAYS-VISIBLE panel: today's intentions + goal sub-tasks -->
+        <!-- ALWAYS-VISIBLE panel: date, intentions, goals, and daily log controls -->
         <div class="always-panel" id="always-panel">
           <div class="always-head">
-            <div class="always-title">Today's Intentions</div>
-            <div class="always-datetag" id="always-datetag">Feb 22, 2026</div>
+            <div class="always-head-top">
+              <div class="always-date-nav">
+                <button class="always-date-nav-btn" type="button" aria-label="Previous day" onclick="stepSelectedDay(-1)">&#8592;</button>
+                <button class="always-date-heading always-date-heading-btn" id="log-date-heading" type="button" onclick="openSelectedDayPicker()">Sunday, February 22</button>
+                <button class="always-date-nav-btn" type="button" aria-label="Next day" onclick="stepSelectedDay(1)">&#8594;</button>
+                <input class="always-day-picker" id="always-day-picker" type="date" onchange="jumpToSelectedDay(this.value)" aria-label="Choose date">
+              </div>
+              <div class="always-day-progress" id="always-day-progress">
+                <div class="always-day-progress-text" id="always-day-progress-text">0% done today</div>
+                <div class="always-day-progress-track"><div class="always-day-progress-fill" id="always-day-progress-fill" style="width:0%"></div></div>
+              </div>
+            </div>
+            <div class="always-sub" id="log-sub">Log your progress, check intentions &amp; leave a reflection.</div>
+            <div class="log-glance-row always-glance-row" id="log-glance-row"></div>
           </div>
           <div class="always-body" id="always-body">
-            <!-- rendered by renderAlwaysPanel() -->
-          </div>
-        </div>
-
-        <!-- Daily log panel — opens when a calendar day is clicked -->
-        <div class="daily-log-panel" id="daily-log-panel" style="display:none">
-          <div class="log-panel-head">
-            <div class="log-date-heading" id="log-date-heading">Sunday, February 22</div>
-            <div class="log-sub" id="log-sub">Log your progress, check intentions &amp; leave a reflection.</div>
-            <div class="log-glance-row" id="log-glance-row"></div>
-          </div>
-
-          <div class="log-body">
-            <!-- Goal metric inputs — dynamically rendered -->
-            <div id="log-goal-metrics"></div>
-
-            <div class="log-section-title">Intentions</div>
-            <div class="task-list" id="task-list"></div>
-            <div class="add-task-row">
-              <input type="text" class="add-task-input" id="new-task-input" placeholder="Add an intention for this day…" onkeydown="if(event.key==='Enter')addTask()">
-              <button class="add-task-btn" onclick="addTask()">+ Add</button>
+            <div id="always-content">
+              <!-- rendered by renderAlwaysPanel() -->
             </div>
-
-            <br>
-            <div class="log-section-title">How Was This Day?</div>
-            <div class="log-dropdowns">
-              <div>
-                <label class="log-select-label">Mood</label>
-                <select class="log-select" id="mood-select">
-                  <option value="">— Choose mood —</option>
-                  <option value="🌟">🌟 Energized</option>
-                  <option value="😊">😊 Good</option>
-                  <option value="😐">😐 Neutral</option>
-                  <option value="😓">😓 Tired</option>
-                  <option value="😔">😔 Low</option>
-                  <option value="🔥">🔥 Focused</option>
-                  <option value="😰">😰 Anxious</option>
-                </select>
+            <div class="always-log-wrap">
+              <!-- Goal metric inputs — dynamically rendered -->
+              <div class="log-section-title">How Was This Day?</div>
+              <div class="log-dropdowns">
+                <div>
+                  <label class="log-select-label">Mood</label>
+                  <select class="log-select" id="mood-select">
+                    <option value="">— Choose mood —</option>
+                    <option value="🌟">🌟 Energized</option>
+                    <option value="😊">😊 Good</option>
+                    <option value="😐">😐 Neutral</option>
+                    <option value="😓">😓 Tired</option>
+                    <option value="😔">😔 Low</option>
+                    <option value="🔥">🔥 Focused</option>
+                    <option value="😰">😰 Anxious</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="log-select-label">Sleep</label>
+                  <select class="log-select" id="sleep-select">
+                    <option value="">— Hours slept —</option>
+                    <option value="under5">😴 Under 5 hrs</option>
+                    <option value="5to6">🌙 5–6 hrs</option>
+                    <option value="6to7">✨ 6–7 hrs</option>
+                    <option value="7to8">⭐ 7–8 hrs</option>
+                    <option value="over8">🌟 8+ hrs</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label class="log-select-label">Sleep</label>
-                <select class="log-select" id="sleep-select">
-                  <option value="">— Hours slept —</option>
-                  <option value="under5">😴 Under 5 hrs</option>
-                  <option value="5to6">🌙 5–6 hrs</option>
-                  <option value="6to7">✨ 6–7 hrs</option>
-                  <option value="7to8">⭐ 7–8 hrs</option>
-                  <option value="over8">🌟 8+ hrs</option>
-                </select>
+              <div class="log-note">
+                <label class="log-select-label">Reflection <span style="opacity:0.4;font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label>
+                <textarea class="log-note-input" id="day-note" placeholder="What stood out today? What will you carry forward?"></textarea>
               </div>
+              <button class="log-save-btn" onclick="saveLog()">Save This Day's Log →</button>
             </div>
-
-            <div class="log-note">
-              <label class="log-select-label">Reflection <span style="opacity:0.4;font-size:10px;text-transform:none;letter-spacing:0">(optional)</span></label>
-              <textarea class="log-note-input" id="day-note" placeholder="What stood out today? What will you carry forward?"></textarea>
-            </div>
-
-            <button class="log-save-btn" onclick="saveLog()">Save This Day's Log →</button>
           </div>
         </div>
       </div>
@@ -443,33 +431,8 @@
         </div>
 
         <div class="intentions-card">
-          <div class="intention-title" style="display:flex;align-items:center;justify-content:space-between;">
-            Today's Intentions
-            <button onclick="openIntentionAdder()" style="width:24px;height:24px;border-radius:50%;background:var(--ink);border:none;color:var(--cream);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.2s;" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">+</button>
-          </div>
-          <div id="intentions-list">
-            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">10km morning run — easy pace</div><span class="intention-goal-tag" style="background:var(--gold)">Marathon</span></div>
-            <div class="intention-item done" onclick="toggleIntention(this)"><div class="intention-check">✓</div><div class="intention-text">Write 700 words before lunch</div><span class="intention-goal-tag" style="background:var(--sage)">Novel</span></div>
-            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">Transfer $300 to savings</div><span class="intention-goal-tag" style="background:var(--sky)">Savings</span></div>
-            <div class="intention-item" onclick="toggleIntention(this)"><div class="intention-check"></div><div class="intention-text">Post a check-in for Sarah</div><span class="intention-goal-tag" style="background:var(--ink)">Circle</span></div>
-          </div>
-          <!-- Add intention inline input — hidden until + clicked -->
-          <div id="intention-adder" style="display:none;margin-top:10px;border-top:1px solid var(--cream-dark);padding-top:12px;">
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-              <input type="text" id="intention-text-input" placeholder="What do you intend to do today?" style="flex:1;padding:9px 12px;border:1.5px solid var(--cream-dark);border-radius:9px;background:var(--cream);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ink);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--ink-muted)'" onblur="this.style.borderColor='var(--cream-dark)'" onkeydown="if(event.key==='Enter')addIntention()">
-            </div>
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <span style="font-size:10px;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;font-weight:500;margin-right:2px;">Tag:</span>
-              <button class="itag-btn sel" data-color="var(--gold)" data-label="Marathon" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #C4963A;background:#C4963A;color:white;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Marathon</button>
-              <button class="itag-btn" data-color="var(--sage)" data-label="Novel" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Novel</button>
-              <button class="itag-btn" data-color="var(--sky)" data-label="Savings" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Savings</button>
-              <button class="itag-btn" data-color="var(--ink)" data-label="Circle" onclick="selectITag(this)" style="padding:4px 10px;border-radius:100px;border:1.5px solid #EDE7DE;background:transparent;color:#8C857D;font-size:10px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;">Circle</button>
-            </div>
-            <div style="display:flex;gap:7px;margin-top:10px;">
-              <button onclick="addIntention()" style="flex:1;padding:9px;background:var(--ink);color:var(--cream);border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;">Add intention</button>
-              <button onclick="closeIntentionAdder()" style="padding:9px 14px;background:transparent;color:var(--ink-muted);border:1.5px solid var(--cream-dark);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">Cancel</button>
-            </div>
-          </div>
+          <div class="intention-title">Today's Intentions</div>
+          <div id="intentions-list"></div>
         </div>
 
         <div>
@@ -485,7 +448,7 @@
         <div class="right-panel-title">Global Rankings</div>
 
         <div class="lb-card">
-          <div class="lb-label">North Star App · Feb 2026</div>
+          <div class="lb-label">NorthStar App · Feb 2026</div>
           <div class="lb-title">Top 10 Leaderboard 🏆</div>
           <div class="lb-sub">Ranked by momentum score</div>
           <div id="lb-rows-sidebar"></div>
@@ -715,7 +678,7 @@
         <polygon points="18,3 20.5,13 30,13 22.5,19.5 25.5,30 18,23.5 10.5,30 13.5,19.5 6,13 15.5,13" fill="#1A1714"/>
         <circle cx="18" cy="18" r="2.5" fill="#C4963A"/>
       </svg>
-      <div class="auth-logo-name">North Star</div>
+      <div class="auth-logo-name">NorthStar</div>
     </div>
     <div id="auth-mode-login">
       <div class="auth-title" id="auth-title">Welcome back.</div>
@@ -847,3 +810,4 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+

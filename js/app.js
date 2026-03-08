@@ -542,7 +542,7 @@ let _authMode = 'login'; // 'login' | 'signup'
 function toggleAuthMode() {
   _authMode = _authMode === 'login' ? 'signup' : 'login';
   document.getElementById('auth-title').textContent = _authMode === 'signup' ? 'Create account.' : 'Welcome back.';
-  document.getElementById('auth-sub').textContent = _authMode === 'signup' ? 'Start your North Star journey.' : 'Sign in to continue your journey.';
+  document.getElementById('auth-sub').textContent = _authMode === 'signup' ? 'Start your NorthStar journey.' : 'Sign in to continue your journey.';
   document.getElementById('auth-submit-btn').textContent = _authMode === 'signup' ? 'Create Account →' : 'Sign In →';
 }
 

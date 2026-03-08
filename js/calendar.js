@@ -24,6 +24,191 @@ let calYear=TODAY_CAL.year, calMonth=TODAY_CAL.month, selectedDate=TODAY_CAL.day
 let calCat='all';
 const dayLogs={};
 
+function ensureDayLogEntry(key){
+  if(!dayLogs[key]) dayLogs[key] = { mood:'', sleep:'', note:'', tasks:[] };
+  if(!Array.isArray(dayLogs[key].tasks)) dayLogs[key].tasks = [];
+  return dayLogs[key];
+}
+
+function textsMatch(a, b){
+  return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+}
+
+function parseDayKey(key){
+  if(!key || typeof key !== 'string') return null;
+  const parts = key.split('-').map(Number);
+  if(parts.length !== 3 || parts.some(Number.isNaN)) return null;
+  return { year:parts[0], month:parts[1], day:parts[2] };
+}
+
+function dayKeyToDate(key){
+  const p = parseDayKey(key);
+  return p ? new Date(p.year, p.month, p.day) : null;
+}
+
+function dateToDayKey(dt){
+  return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+}
+
+function toDateInputValue(yr, mo, dy){
+  return `${yr}-${String(mo + 1).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
+}
+
+function daysBetweenKeys(aKey, bKey){
+  const a = dayKeyToDate(aKey);
+  const b = dayKeyToDate(bKey);
+  if(!a || !b) return null;
+  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.floor((utcA - utcB) / 86400000);
+}
+
+function normalizeIntentWeekdays(days, fallbackWeekday){
+  const arr = Array.isArray(days) ? days : [];
+  const normalized = [...new Set(arr.map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))];
+  if(normalized.length) return normalized.sort((a, b) => a - b);
+  return [fallbackWeekday];
+}
+
+function getIntentRecurrenceSignature(intent){
+  if(!intent) return 'none';
+  const recur = intent.recurrence || 'day';
+  if(recur === 'daily') return 'daily';
+  if(recur === 'day') return `day:${intent.dateKey || ''}`;
+  if(recur === 'alternate') return `alternate:${intent.anchorKey || intent.dateKey || ''}`;
+  if(recur === 'weekly') return `weekly:${intent.anchorKey || intent.dateKey || ''}`;
+  if(recur === 'custom'){
+    const anchorDate = dayKeyToDate(intent.anchorKey || intent.dateKey || TODAY_KEY) || new Date(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
+    const days = normalizeIntentWeekdays(intent.weekdays, anchorDate.getDay());
+    const interval = [1, 2, 4].includes(Number(intent.intervalWeeks)) ? Number(intent.intervalWeeks) : 1;
+    return `custom:${days.join(',')}:${interval}`;
+  }
+  return recur;
+}
+
+function intentionAppliesToDate(intent, key){
+  if(!intent) return false;
+  if(intent.recurrence === 'daily') return true;
+  if(intent.recurrence === 'day') return intent.dateKey === key;
+  if(intent.recurrence === 'alternate'){
+    const anchor = intent.anchorKey || intent.dateKey;
+    const diff = daysBetweenKeys(key, anchor);
+    return diff !== null && diff >= 0 && diff % 2 === 0;
+  }
+  if(intent.recurrence === 'weekly'){
+    const anchor = intent.anchorKey || intent.dateKey;
+    const diff = daysBetweenKeys(key, anchor);
+    return diff !== null && diff >= 0 && diff % 7 === 0;
+  }
+  if(intent.recurrence === 'custom'){
+    const anchorKey = intent.anchorKey || intent.dateKey || TODAY_KEY;
+    const anchorDate = dayKeyToDate(anchorKey) || new Date(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
+    const current = dayKeyToDate(key);
+    if(!current) return false;
+    const diff = daysBetweenKeys(key, anchorKey);
+    if(diff === null || diff < 0) return false;
+    const weekdays = normalizeIntentWeekdays(intent.weekdays, anchorDate.getDay());
+    if(!weekdays.includes(current.getDay())) return false;
+    const intervalWeeks = [1, 2, 4].includes(Number(intent.intervalWeeks)) ? Number(intent.intervalWeeks) : 1;
+    const weekDiff = Math.floor(diff / 7);
+    return weekDiff % intervalWeeks === 0;
+  }
+  return false;
+}
+
+function getIntentionDefsForDate(key){
+  return intentionsStore.filter(intent => intentionAppliesToDate(intent, key));
+}
+
+function getPersonalIntentionRowsForDate(yr, mo, dy, mutate){
+  const key = `${yr}-${mo}-${dy}`;
+  const defs = getIntentionDefsForDate(key);
+  const log = dayLogs[key];
+  const existing = (log?.tasks || []).filter(t => !t._fromGoal);
+  const rows = [];
+
+  defs.forEach(def => {
+    let task = existing.find(t => t._intentId === def.id || textsMatch(t.text, def.text));
+    if(!task && mutate){
+      const target = ensureDayLogEntry(key);
+      task = { text:def.text, checked:false, _intentId:def.id, badge:null, badgeColor:null };
+      target.tasks.push(task);
+    }
+    rows.push({
+      id: def.id,
+      text: def.text,
+      checked: !!task?.checked
+    });
+  });
+
+  return rows;
+}
+
+function setPersonalIntentionChecked(intentId, yr, mo, dy, checked){
+  const key = `${yr}-${mo}-${dy}`;
+  const def = intentionsStore.find(i => i.id === intentId);
+  if(!def) return false;
+
+  const log = ensureDayLogEntry(key);
+  let task = log.tasks.find(t => !t._fromGoal && (t._intentId === intentId || textsMatch(t.text, def.text)));
+  if(!task){
+    task = { text:def.text, checked:false, _intentId:intentId, badge:null, badgeColor:null };
+    log.tasks.push(task);
+  }
+  task.checked = !!checked;
+  task.badge = null;
+  task.badgeColor = null;
+  return true;
+}
+
+function setPersonalIntentionCheckedByText(text, yr, mo, dy, checked){
+  if(!text) return false;
+  const key = `${yr}-${mo}-${dy}`;
+  let changed = false;
+
+  getIntentionDefsForDate(key)
+    .filter(def => textsMatch(def.text, text))
+    .forEach(def => { changed = setPersonalIntentionChecked(def.id, yr, mo, dy, checked) || changed; });
+
+  const log = dayLogs[key];
+  if(log){
+    log.tasks
+      .filter(t => !t._fromGoal && textsMatch(t.text, text))
+      .forEach(t => { t.checked = !!checked; changed = true; });
+  }
+  return changed;
+}
+
+function syncGoalSubsFromPersonalText(text, isDone, yr, mo, dy){
+  if(!text) return false;
+  let changed = false;
+  const key = `${yr}-${mo}-${dy}`;
+
+  GOALS.forEach(g => {
+    if(!goalActiveOnDay(g, yr, mo, dy)) return;
+    g.subs.forEach(s => {
+      if(!textsMatch(s.text, text)) return;
+      if(s.done !== !!isDone){
+        s.done = !!isDone;
+        changed = true;
+      }
+
+      const log = ensureDayLogEntry(key);
+      let existing = log.tasks.find(t => t._fromGoal === g.id && (t._subId === s.id || textsMatch(t.text, s.text)));
+      if(existing){
+        if(existing.checked !== !!isDone){
+          existing.checked = !!isDone;
+          changed = true;
+        }
+      } else {
+        log.tasks.push({ text:s.text, checked:!!isDone, badge:g.name, badgeColor:g.hex, _fromGoal:g.id, _subId:s.id });
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
 function selectTodayOnCalendar(openDayPanel){
   const shouldOpen = openDayPanel !== false;
   calYear = TODAY_CAL.year;
@@ -136,8 +321,12 @@ function buildCalendar(){
     const key = `${calYear}-${calMonth}-${day}`;
     const log = dayLogs[key];
 
-    // Filter tasks by category
-    const allTasks = log?.tasks || [];
+    // Include personal intentions active on this day + goal-linked tasks.
+    const personalRows = getPersonalIntentionRowsForDate(calYear, calMonth, day, false);
+    const allTasks = [
+      ...personalRows.map(r => ({ text:r.text, checked:r.checked, badge:null, badgeColor:null })),
+      ...((log?.tasks || []).filter(t => t._fromGoal))
+    ];
     // Dynamic category filter based on actual goal names
     const catGoalNames = GOALS.filter(g=>g.cat===calCat).map(g=>g.name);
     const filteredTasks = calCat==='all' ? allTasks : allTasks.filter(t=> catGoalNames.some(n=> t.badge&&t.badge===n));
@@ -321,71 +510,162 @@ function appendGoalLinkedIntentionsSection(taskListEl, rows, withTopGap){
   taskListEl.appendChild(section);
 }
 
+function renderDayGlance(yr, mo, dy, baseTasks, goalLinkedRows){
+  const key = `${yr}-${mo}-${dy}`;
+  const log = dayLogs[key];
+  const isToday = isTodayDate(yr, mo, dy);
+  const activeGoals = GOALS.filter(g => goalActiveOnDay(g, yr, mo, dy));
+  const glance = document.getElementById('log-glance-row');
+  if(!glance) return;
+  glance.innerHTML = '';
+
+  const totalTasks = baseTasks.length + goalLinkedRows.length;
+  const doneTasks = baseTasks.filter(t => !!t.checked).length + goalLinkedRows.filter(t => !!t.checked).length;
+  const sleepMap = { under5:'<5 hrs', '5to6':'5-6 hrs', '6to7':'6-7 hrs', '7to8':'7-8 hrs', over8:'8+ hrs' };
+
+  if(log?.mood) glance.innerHTML += `<div class="log-glance-pill">${log.mood} Mood</div>`;
+  if(log?.sleep) glance.innerHTML += `<div class="log-glance-pill">Sleep ${sleepMap[log.sleep] || log.sleep}</div>`;
+  if(totalTasks > 0 && doneTasks > 0){
+    const col = doneTasks === totalTasks ? 'var(--sage)' : 'var(--gold)';
+    glance.innerHTML += `<div class="log-glance-pill"><div class="glance-dot" style="background:${col}"></div>${doneTasks}/${totalTasks} completed</div>`;
+  }
+  if(log?.note) glance.innerHTML += `<div class="log-glance-pill">Reflection added</div>`;
+
+  activeGoals.forEach(g => {
+    const e = g.entries.find(en => en.date === key);
+    if(e) glance.innerHTML += `<div class="log-glance-pill" style="color:${g.hex};border-color:${g.hex}22">+${fmtMetric(e.val,g.unit)}</div>`;
+  });
+
+  if(!glance.children.length){
+    glance.innerHTML = `<div class="log-glance-pill" style="color:var(--ink-muted)">${isToday ? 'No check-ins yet today' : 'No check-ins yet for this day'}</div>`;
+  }
+
+  const fill = document.getElementById('always-day-progress-fill');
+  const text = document.getElementById('always-day-progress-text');
+  if(fill && text){
+    const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+    fill.style.width = `${pct}%`;
+    if(totalTasks === 0){
+      text.textContent = 'No intentions yet';
+    } else if(doneTasks === totalTasks){
+      text.textContent = 'All done today';
+    } else {
+      text.textContent = `${doneTasks}/${totalTasks} done`;
+    }
+  }
+}
+
 function selectDay(day, cell){
   selectedDate  = day;
   selectedMonth = calMonth;
   selectedYear  = calYear;
+  if (typeof alwaysExpandedGoalId !== 'undefined') alwaysExpandedGoalId = null;
 
   document.querySelectorAll('.cal-cell').forEach(c=>c.classList.remove('selected'));
   cell.classList.add('selected');
 
-  const dt  = new Date(calYear, calMonth, day);
+  const dt = new Date(calYear, calMonth, day);
   const key = `${calYear}-${calMonth}-${day}`;
-  const isToday = isTodayDate(calYear, calMonth, day);
+  const log = dayLogs[key];
 
   document.getElementById('log-date-heading').textContent =
     dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const picker = document.getElementById('always-day-picker');
+  if(picker) picker.value = toDateInputValue(calYear, calMonth, day);
 
-  const log = dayLogs[key];
   document.getElementById('mood-select').value  = log?.mood  || '';
   document.getElementById('sleep-select').value = log?.sleep || '';
   document.getElementById('day-note').value     = log?.note  || '';
 
-  // ── Build merged task list for this day ─────────────────────
-  // 1) Start with logged tasks (or today's intentions)
-  const tl = document.getElementById('task-list');
-  tl.innerHTML = '';
-  const baseTasks = (log?.tasks || []).filter(t => !t._fromGoal);
-  baseTasks.forEach(t => tl.appendChild(createTaskEl(t.text, t.checked, t.badgeColor, t.badge)));
-
-  // 2) Inject goal sub-tasks for goals active on this day
   const activeGoals = GOALS.filter(g => goalActiveOnDay(g, calYear, calMonth, day));
+  const baseTasks = getPersonalIntentionRowsForDate(calYear, calMonth, day, false);
   const goalLinkedRows = buildGoalLinkedIntentionRows(log, activeGoals);
-  appendGoalLinkedIntentionsSection(tl, goalLinkedRows, baseTasks.length > 0);
 
-  // ── Always panel: update for selected day ──────────────────
   renderAlwaysPanel(calYear, calMonth, day);
-
-  // ── Log panel: goal metric inputs ──────────────────────────
   renderLogGoalMetrics(calYear, calMonth, day);
+  renderDayGlance(calYear, calMonth, day, baseTasks, goalLinkedRows);
+  renderRightPanelIntentions();
 
-  // ── At-a-glance pills ──────────────────────────────────────
-  const glance = document.getElementById('log-glance-row');
-  glance.innerHTML = '';
-  // Count total intentions including goal-linked rows
-  const totalTasks = baseTasks.length + goalLinkedRows.length;
-  const doneTasks  = baseTasks.filter(t=>t.checked).length + goalLinkedRows.filter(r=>r.checked).length;
-  if(log){
-    const sleepMap = {under5:'<5 hrs','5to6':'5–6 hrs','6to7':'6–7 hrs','7to8':'7–8 hrs',over8:'8+ hrs'};
-    if(log.mood)  glance.innerHTML += `<div class="log-glance-pill">${log.mood} Mood</div>`;
-    if(log.sleep) glance.innerHTML += `<div class="log-glance-pill">💤 ${sleepMap[log.sleep]||log.sleep}</div>`;
-    if(totalTasks>0){
-      const col = doneTasks===totalTasks?'var(--sage)':doneTasks>0?'var(--gold)':'var(--rose)';
-      glance.innerHTML += `<div class="log-glance-pill"><div class="glance-dot" style="background:${col}"></div>${doneTasks}/${totalTasks} intentions</div>`;
-    }
-    if(log.note) glance.innerHTML += `<div class="log-glance-pill">✍️ Reflection</div>`;
-    // Goal progress pills
-    activeGoals.forEach(g=>{
-      const e = g.entries.find(en=>en.date===key);
-      if(e) glance.innerHTML += `<div class="log-glance-pill" style="color:${g.hex};border-color:${g.hex}22">+${fmtMetric(e.val,g.unit)}</div>`;
-    });
-  } else {
-    glance.innerHTML = `<div class="log-glance-pill" style="color:var(--ink-muted)">${isToday?'Today — log your progress':'No log yet — fill in below'}</div>`;
+  const panel = document.getElementById('always-panel');
+  if(panel) setTimeout(()=> panel.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
+}
+
+function goToDay(yr, mo, dy, shouldScroll){
+  const yy = Number(yr);
+  const mm = Number(mo);
+  const dd = Number(dy);
+  if(!Number.isInteger(yy) || !Number.isInteger(mm) || !Number.isInteger(dd)) return;
+
+  calYear = yy;
+  calMonth = mm;
+  selectedYear = yy;
+  selectedMonth = mm;
+  selectedDate = dd;
+  if (typeof alwaysExpandedGoalId !== 'undefined') alwaysExpandedGoalId = null;
+
+  buildCalendar();
+  const cells = document.querySelectorAll('.cal-grid .cal-cell:not(.other-month)');
+  const cell = cells[dd - 1];
+  if(cell){
+    selectDay(dd, cell);
+    return;
   }
 
-  const panel = document.getElementById('daily-log-panel');
-  panel.style.display = 'block';
-  setTimeout(()=> panel.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
+  const key = `${yy}-${mm}-${dd}`;
+  const log = dayLogs[key];
+  const heading = document.getElementById('log-date-heading');
+  if(heading){
+    heading.textContent = new Date(yy, mm, dd).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  }
+  const picker = document.getElementById('always-day-picker');
+  if(picker) picker.value = toDateInputValue(yy, mm, dd);
+
+  const mood = document.getElementById('mood-select');
+  const sleep = document.getElementById('sleep-select');
+  const note = document.getElementById('day-note');
+  if(mood) mood.value = log?.mood || '';
+  if(sleep) sleep.value = log?.sleep || '';
+  if(note) note.value = log?.note || '';
+
+  const activeGoals = GOALS.filter(g => goalActiveOnDay(g, yy, mm, dd));
+  const baseTasks = getPersonalIntentionRowsForDate(yy, mm, dd, false);
+  const goalLinkedRows = buildGoalLinkedIntentionRows(log, activeGoals);
+  renderAlwaysPanel(yy, mm, dd);
+  renderLogGoalMetrics(yy, mm, dd);
+  renderDayGlance(yy, mm, dd, baseTasks, goalLinkedRows);
+  renderRightPanelIntentions();
+
+  if(shouldScroll){
+    const panel = document.getElementById('always-panel');
+    if(panel) setTimeout(() => panel.scrollIntoView({ behavior:'smooth', block:'nearest' }), 60);
+  }
+}
+
+function stepSelectedDay(offset){
+  const yy = selectedYear ?? TODAY_CAL.year;
+  const mm = selectedMonth ?? TODAY_CAL.month;
+  const dd = selectedDate ?? TODAY_CAL.day;
+  const next = new Date(yy, mm, dd);
+  next.setDate(next.getDate() + Number(offset || 0));
+  goToDay(next.getFullYear(), next.getMonth(), next.getDate(), false);
+}
+
+function openSelectedDayPicker(){
+  const picker = document.getElementById('always-day-picker');
+  if(!picker) return;
+  const yy = selectedYear ?? TODAY_CAL.year;
+  const mm = selectedMonth ?? TODAY_CAL.month;
+  const dd = selectedDate ?? TODAY_CAL.day;
+  picker.value = toDateInputValue(yy, mm, dd);
+  if(typeof picker.showPicker === 'function') picker.showPicker();
+  else picker.click();
+}
+
+function jumpToSelectedDay(value){
+  if(!value) return;
+  const selected = new Date(`${value}T12:00:00`);
+  if(Number.isNaN(selected.getTime())) return;
+  goToDay(selected.getFullYear(), selected.getMonth(), selected.getDate(), false);
 }
 
 // Toggle a goal sub-task from the daily log panel
@@ -428,119 +708,111 @@ function toggleTask(item){
   const yy = selectedYear ?? TODAY_CAL.year;
   const mm = selectedMonth ?? TODAY_CAL.month;
   const dd = selectedDate ?? TODAY_CAL.day;
+  const key = `${yy}-${mm}-${dd}`;
+
+  setPersonalIntentionCheckedByText(text, yy, mm, dd, isDone);
+  const goalSyncChanged = syncGoalSubsFromPersonalText(text, isDone, yy, mm, dd);
   const autoChanged = applyAutoMetricForIntentionText(text, isDone, yy, mm, dd);
 
-  // If this is today's calendar — sync back to intentionsStore + right panel
-  if(isTodayDate(selectedYear, selectedMonth, selectedDate)){
-    const found = intentionsStore.find(i => i.text === text);
-    if(found){
-      found.done = isDone;
-      const rpItems = document.querySelectorAll('#intentions-list .intention-item');
-      rpItems.forEach(rp => {
-        if(rp.querySelector('.intention-text')?.textContent === text){
-          if(isDone){ rp.classList.add('done'); rp.querySelector('.intention-check').textContent='✓'; }
-          else { rp.classList.remove('done'); rp.querySelector('.intention-check').textContent=''; }
-        }
-      });
-    }
-  }
-
-  if(autoChanged){
+  if(goalSyncChanged || autoChanged){
     rerenderGoalsKeepExpanded();
     renderCalGoalStrip();
-    buildCalendar();
-    renderAlwaysPanel(yy, mm, dd);
+  }
+
+  buildCalendar();
+  renderAlwaysPanel(yy, mm, dd);
+  renderDayGlance(
+    yy,
+    mm,
+    dd,
+    getPersonalIntentionRowsForDate(yy, mm, dd, false),
+    buildGoalLinkedIntentionRows(dayLogs[key], GOALS.filter(g => goalActiveOnDay(g, yy, mm, dd)))
+  );
+  if(yy === TODAY_CAL.year && mm === TODAY_CAL.month && dd === TODAY_CAL.day){
+    const matchedTodayIds = getPersonalIntentionRowsForDate(yy, mm, dd, true)
+      .filter(r => textsMatch(r.text, text))
+      .map(r => r.id);
+    if(matchedTodayIds.length){
+      matchedTodayIds.forEach(id => updateRightPanelIntentions(id, isDone));
+    } else {
+      renderRightPanelIntentions();
+    }
+  } else {
+    renderRightPanelIntentions();
   }
 }
 
-function addTask(){
-  const input = document.getElementById('new-task-input');
-  const text = input.value.trim(); if(!text) return;
-  const taskList = document.getElementById('task-list');
-  const newItem = createTaskEl(text, false, 'var(--ink-muted)', null);
-  const goalSection = taskList.querySelector('.goal-linked-section');
-  if(goalSection) taskList.insertBefore(newItem, goalSection);
-  else taskList.appendChild(newItem);
-  input.value = '';
-  showToast('Intention added.');
-}
-
-// ─── SAVE LOG ────────────────────────────────────────────────
+// Save daily log state
 function saveLog(){
   const key = `${calYear}-${calMonth}-${selectedDate}`;
-  const mood  = document.getElementById('mood-select').value;
-  const sleep = document.getElementById('sleep-select').value;
-  const note  = document.getElementById('day-note').value;
-  const tasks = Array.from(document.querySelectorAll('#task-list .task-item')).map(item=>({
-    text: item.querySelector('.task-text').textContent,
-    checked: item.classList.contains('checked'),
-    badgeColor: item.querySelector('.task-goal-badge')?.style.background || null,
-    badge: item.querySelector('.task-goal-badge')?.textContent || null,
-    _fromGoal: item.getAttribute('data-goal-id') || null,
-    _subId: item.getAttribute('data-sub-id') || null
-  }));
-  dayLogs[key] = {mood, sleep, note, tasks};
+  const mood  = document.getElementById('mood-select')?.value || '';
+  const sleep = document.getElementById('sleep-select')?.value || '';
+  const note  = document.getElementById('day-note')?.value || '';
 
-  // If saving today — sync task state back to intentionsStore + right panel
-  if(isTodayDate(selectedYear, selectedMonth, selectedDate)){
-    tasks.forEach(t => {
-      const found = intentionsStore.find(i => i.text === t.text);
-      if(found) found.done = t.checked;
+  const activeGoals = GOALS.filter(g => goalActiveOnDay(g, calYear, calMonth, selectedDate));
+  const log = ensureDayLogEntry(key);
+  const existingTasks = log.tasks || [];
+
+  const personalTasks = getPersonalIntentionRowsForDate(calYear, calMonth, selectedDate, true).map(row => {
+    const saved = existingTasks.find(t => !t._fromGoal && (t._intentId === row.id || textsMatch(t.text, row.text)));
+    return {
+      text: row.text,
+      checked: saved ? !!saved.checked : !!row.checked,
+      _intentId: row.id,
+      badge: null,
+      badgeColor: null,
+      _fromGoal: null,
+      _subId: null
+    };
+  });
+
+  const goalTasks = activeGoals.flatMap(g => {
+    return g.subs.map(s => {
+      const saved = existingTasks.find(t => t._fromGoal === g.id && (t._subId === s.id || textsMatch(t.text, s.text)));
+      const checked = isTodayDate(calYear, calMonth, selectedDate) ? !!s.done : (saved ? !!saved.checked : false);
+      return {
+        text: s.text,
+        checked,
+        badgeColor: g.hex,
+        badge: g.name,
+        _fromGoal: g.id,
+        _subId: s.id
+      };
     });
-    // Refresh right panel intentions list visual state
-    const rpItems = document.querySelectorAll('#intentions-list .intention-item');
-    rpItems.forEach(rp => {
-      const text = rp.querySelector('.intention-text')?.textContent;
-      const found = intentionsStore.find(i => i.text === text);
-      if(found){
-        if(found.done){ rp.classList.add('done'); rp.querySelector('.intention-check').textContent='✓'; }
-        else { rp.classList.remove('done'); rp.querySelector('.intention-check').textContent=''; }
-      }
-    });
-  }
+  });
+
+  dayLogs[key] = { mood, sleep, note, tasks:[...personalTasks, ...goalTasks] };
 
   buildCalendar();
   const allCells = document.querySelectorAll('.cal-grid .cal-cell:not(.other-month)');
   if(allCells[selectedDate-1]) allCells[selectedDate-1].classList.add('selected');
-  showToast('📅 Day logged. Every day counts.');
+
+  renderAlwaysPanel(calYear, calMonth, selectedDate);
+  renderDayGlance(calYear, calMonth, selectedDate, getPersonalIntentionRowsForDate(calYear, calMonth, selectedDate, false), buildGoalLinkedIntentionRows(dayLogs[key], activeGoals));
+  renderRightPanelIntentions();
+  showToast('Day logged. Every day counts.');
 }
 
-// ─── INTENTIONS — store, add, toggle, sync ────────────────────
-const intentionsStore = [
-  { text:'10km morning run — easy pace', done:false, color:'var(--gold)',  label:'Marathon' },
-  { text:'Write 700 words before lunch',  done:true,  color:'var(--sage)',  label:'Novel'    },
-  { text:'Transfer $300 to savings',      done:false, color:'var(--sky)',   label:'Savings'  },
-  { text:'Post a check-in for Sarah',     done:false, color:'var(--ink)',   label:'Circle'   },
+// Intentions model: personal intentions support day, daily, alternate, weekly, and custom schedules.
+let intentionsStore = [
+  { id:'pi1', text:'Read 10 pages before bed', recurrence:'daily' },
+  { id:'pi2', text:'Take a 15-minute walk after lunch', recurrence:'daily' },
+  { id:'pi3', text:'Call Sarah for a quick check-in', recurrence:'day', dateKey:TODAY_KEY },
 ];
 
 function syncIntentionsToCalendar() {
-  // Sync today's intentions into dayLogs
-  if (!dayLogs[TODAY_KEY]) dayLogs[TODAY_KEY] = { mood:'🔥', sleep:'7to8', note:'', tasks:[] };
-  // Keep only tasks that aren't from goals (goal subs are handled separately)
-  const nonGoalTasks = dayLogs[TODAY_KEY].tasks.filter(t => t._fromGoal);
-  dayLogs[TODAY_KEY].tasks = [
-    ...intentionsStore.map(i => ({
-      text: i.text, checked: i.done, badgeColor: resolveCssVar(i.color), badge: i.label
-    })),
-    ...nonGoalTasks
-  ];
+  getPersonalIntentionRowsForDate(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day, true);
+  const yy = selectedYear ?? TODAY_CAL.year;
+  const mm = selectedMonth ?? TODAY_CAL.month;
+  const dd = selectedDate ?? TODAY_CAL.day;
+  getPersonalIntentionRowsForDate(yy, mm, dd, true);
+
   buildCalendar();
   renderCalGoalStrip();
-  renderAlwaysPanel(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
-  // If today's log panel is open, refresh its base task list (non-goal tasks)
-  if (isTodayDate(selectedYear, selectedMonth, selectedDate)) {
-    const panel = document.getElementById('daily-log-panel');
-    if (panel && panel.style.display !== 'none') {
-      const tl = document.getElementById('task-list');
-      if(tl){
-        tl.innerHTML = '';
-        intentionsStore.forEach(i => tl.appendChild(createTaskEl(i.text, i.done, resolveCssVar(i.color), i.label)));
-        const activeGoals = GOALS.filter(g => goalActiveOnDay(g, TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day));
-        const goalLinkedRows = buildGoalLinkedIntentionRows(dayLogs[TODAY_KEY], activeGoals);
-        appendGoalLinkedIntentionsSection(tl, goalLinkedRows, intentionsStore.length > 0);
-      }
-    }
-  }
+  renderAlwaysPanel(yy, mm, dd);
+  const key = `${yy}-${mm}-${dd}`;
+  renderDayGlance(yy, mm, dd, getPersonalIntentionRowsForDate(yy, mm, dd, false), buildGoalLinkedIntentionRows(dayLogs[key], GOALS.filter(g => goalActiveOnDay(g, yy, mm, dd))));
+  renderRightPanelIntentions();
 }
 
 function resolveCssVar(v){
@@ -552,122 +824,263 @@ function resolveCssVar(v){
   return map[v] || v;
 }
 
-let intentionAdderContext = { yr: TODAY_CAL.year, mo: TODAY_CAL.month, dy: TODAY_CAL.day };
+let intentionAdderContext = {
+  yr: TODAY_CAL.year,
+  mo: TODAY_CAL.month,
+  dy: TODAY_CAL.day,
+  open:false,
+  mode:'day',
+  customDays:[new Date(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day).getDay()],
+  customIntervalWeeks:1
+};
+const rightPanelIntentionRemovalTimers = new Map();
 
 function openIntentionAdder(yr, mo, dy) {
-  const yy = Number.isInteger(yr) ? yr : TODAY_CAL.year;
-  const mm = Number.isInteger(mo) ? mo : TODAY_CAL.month;
-  const dd = Number.isInteger(dy) ? dy : TODAY_CAL.day;
-  intentionAdderContext = { yr: yy, mo: mm, dy: dd };
-
-  const adder = document.getElementById('intention-adder');
-  if(!adder) return;
-  adder.style.display = 'block';
-  adder.style.animation = 'slideUp 0.2s ease both';
-  const inp = document.getElementById('intention-text-input');
-  if(inp){
-    const isTodayCtx = isTodayDate(yy, mm, dd);
-    inp.placeholder = isTodayCtx
-      ? 'What do you intend to do today?'
-      : `Add an intention for ${new Date(yy, mm, dd).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
-  }
-  setTimeout(() => { if(inp) inp.focus(); }, 50);
+  const yy = Number.isInteger(yr) ? yr : (selectedYear ?? TODAY_CAL.year);
+  const mm = Number.isInteger(mo) ? mo : (selectedMonth ?? TODAY_CAL.month);
+  const dd = Number.isInteger(dy) ? dy : (selectedDate ?? TODAY_CAL.day);
+  const weekday = new Date(yy, mm, dd).getDay();
+  intentionAdderContext = {
+    yr: yy,
+    mo: mm,
+    dy: dd,
+    open:true,
+    mode:'day',
+    customDays:[weekday],
+    customIntervalWeeks:1
+  };
+  renderAlwaysPanel(yy, mm, dd);
+  setTimeout(() => document.getElementById('always-intention-input')?.focus(), 40);
 }
 
 function closeIntentionAdder() {
-  const adder = document.getElementById('intention-adder');
-  if(adder) adder.style.display = 'none';
-  const inp = document.getElementById('intention-text-input');
-  if(inp){
-    inp.value = '';
-    inp.placeholder = 'What do you intend to do today?';
-  }
-  intentionAdderContext = { yr: TODAY_CAL.year, mo: TODAY_CAL.month, dy: TODAY_CAL.day };
-  document.querySelectorAll('.itag-btn').forEach((b,i) => {
-    if(i===0){ b.classList.add('sel'); const c=resolveCssVar(b.getAttribute('data-color')); b.style.background=c;b.style.color='white';b.style.borderColor=c; }
-    else { b.classList.remove('sel');b.style.background='transparent';b.style.color='#8C857D';b.style.borderColor='#EDE7DE'; }
-  });
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
+  const weekday = new Date(yy, mm, dd).getDay();
+  intentionAdderContext = {
+    yr: yy,
+    mo: mm,
+    dy: dd,
+    open:false,
+    mode:'day',
+    customDays:[weekday],
+    customIntervalWeeks:1
+  };
+
+  renderAlwaysPanel(yy, mm, dd);
 }
 
-function selectITag(btn) {
-  document.querySelectorAll('.itag-btn').forEach(b => { b.classList.remove('sel');b.style.background='transparent';b.style.color='#8C857D';b.style.borderColor='#EDE7DE'; });
-  btn.classList.add('sel');
-  const c = resolveCssVar(btn.getAttribute('data-color'));
-  btn.style.background=c; btn.style.color='white'; btn.style.borderColor=c;
+function setIntentionAdderMode(mode){
+  if(!['daily', 'day', 'alternate', 'weekly', 'custom'].includes(mode)) return;
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
+  const fallbackWeekday = new Date(yy, mm, dd).getDay();
+
+  intentionAdderContext.mode = mode;
+  intentionAdderContext.customDays = normalizeIntentWeekdays(intentionAdderContext.customDays, fallbackWeekday);
+  intentionAdderContext.customIntervalWeeks = [1, 2, 4].includes(Number(intentionAdderContext.customIntervalWeeks))
+    ? Number(intentionAdderContext.customIntervalWeeks)
+    : 1;
+
+  renderAlwaysPanel(yy, mm, dd);
+  setTimeout(() => document.getElementById('always-intention-input')?.focus(), 0);
+}
+
+function toggleIntentionCustomSchedule(){
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
+  const fallbackWeekday = new Date(yy, mm, dd).getDay();
+
+  if(intentionAdderContext?.mode === 'custom'){
+    intentionAdderContext.mode = 'day';
+  } else {
+    intentionAdderContext.mode = 'custom';
+    intentionAdderContext.customDays = normalizeIntentWeekdays(intentionAdderContext.customDays, fallbackWeekday);
+  }
+
+  renderAlwaysPanel(yy, mm, dd);
+  setTimeout(() => document.getElementById('always-intention-input')?.focus(), 0);
+}
+
+function toggleIntentionCustomDay(dayIndex){
+  if(!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex > 6) return;
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
+  const fallbackWeekday = new Date(yy, mm, dd).getDay();
+
+  const existing = normalizeIntentWeekdays(intentionAdderContext?.customDays, fallbackWeekday);
+  const next = existing.includes(dayIndex)
+    ? existing.filter(d => d !== dayIndex)
+    : [...existing, dayIndex];
+
+  intentionAdderContext.customDays = normalizeIntentWeekdays(next, fallbackWeekday);
+  intentionAdderContext.mode = 'custom';
+  renderAlwaysPanel(yy, mm, dd);
+}
+
+function setIntentionCustomInterval(weeks){
+  const parsed = Number(weeks);
+  if(![1, 2, 4].includes(parsed)) return;
+  intentionAdderContext.customIntervalWeeks = parsed;
+  intentionAdderContext.mode = 'custom';
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
+  renderAlwaysPanel(yy, mm, dd);
+}
+
+function recurrenceToastLabel(recurrence){
+  if(recurrence === 'daily') return 'Added daily intention.';
+  if(recurrence === 'day') return 'Added intention for this day.';
+  if(recurrence === 'alternate') return 'Added alternate-day intention.';
+  if(recurrence === 'weekly') return 'Added weekly intention.';
+  if(recurrence === 'custom') return 'Added custom-schedule intention.';
+  return 'Added intention.';
 }
 
 function addIntention() {
-  const input = document.getElementById('intention-text-input');
+  const input = document.getElementById('always-intention-input');
+  if(!input) return;
   const text = input.value.trim();
-  if (!text) { input.style.borderColor='#B5705B'; setTimeout(()=>input.style.borderColor='#EDE7DE',1000); return; }
-  const selTag = document.querySelector('.itag-btn.sel');
-  const label = selTag ? selTag.getAttribute('data-label') : null;
-  const colorVar = selTag ? selTag.getAttribute('data-color') : 'var(--ink-muted)';
-  const colorHex = resolveCssVar(colorVar);
+  if (!text) {
+    input.style.borderColor = '#B5705B';
+    setTimeout(() => { input.style.borderColor = ''; }, 900);
+    return;
+  }
 
-  const yy = intentionAdderContext?.yr ?? TODAY_CAL.year;
-  const mm = intentionAdderContext?.mo ?? TODAY_CAL.month;
-  const dd = intentionAdderContext?.dy ?? TODAY_CAL.day;
+  const yy = intentionAdderContext?.yr ?? (selectedYear ?? TODAY_CAL.year);
+  const mm = intentionAdderContext?.mo ?? (selectedMonth ?? TODAY_CAL.month);
+  const dd = intentionAdderContext?.dy ?? (selectedDate ?? TODAY_CAL.day);
   const key = `${yy}-${mm}-${dd}`;
-  const isTodayCtx = key === TODAY_KEY;
+  const recurrence = ['daily', 'day', 'alternate', 'weekly', 'custom'].includes(intentionAdderContext?.mode)
+    ? intentionAdderContext.mode
+    : 'day';
+  const fallbackWeekday = new Date(yy, mm, dd).getDay();
+  const customDays = normalizeIntentWeekdays(intentionAdderContext?.customDays, fallbackWeekday);
+  const customIntervalWeeks = [1, 2, 4].includes(Number(intentionAdderContext?.customIntervalWeeks))
+    ? Number(intentionAdderContext.customIntervalWeeks)
+    : 1;
 
-  if(isTodayCtx){
-    if(intentionsStore.some(i => i.text === text)){
-      showToast('This intention already exists for today.');
-      return;
-    }
-    intentionsStore.push({ text, done:false, color:colorVar, label });
-    const list = document.getElementById('intentions-list');
-    if(list){
-      const item = document.createElement('div');
-      item.className = 'intention-item';
-      item.onclick = () => toggleIntention(item);
-      item.innerHTML = `<div class="intention-check"></div><div class="intention-text">${text}</div>${label?`<span class="intention-goal-tag" style="background:${colorHex}">${label}</span>`:''}`;
-      item.style.opacity='0'; item.style.transform='translateY(8px)';
-      list.appendChild(item);
-      requestAnimationFrame(()=>{ item.style.transition='opacity 0.28s ease,transform 0.28s ease'; item.style.opacity='1'; item.style.transform='translateY(0)'; });
-    }
-    syncIntentionsToCalendar();
-    closeIntentionAdder();
-    showToast(`✓ Added to today & calendar: "${text}"`);
+  const candidate = {
+    recurrence,
+    ...(recurrence === 'day' ? { dateKey:key } : {}),
+    ...(recurrence === 'alternate' ? { anchorKey:key } : {}),
+    ...(recurrence === 'weekly' ? { anchorKey:key } : {}),
+    ...(recurrence === 'custom' ? { anchorKey:key, weekdays:customDays, intervalWeeks:customIntervalWeeks } : {})
+  };
+
+  const duplicate = intentionsStore.some(intent =>
+    textsMatch(intent.text, text) &&
+    getIntentRecurrenceSignature(intent) === getIntentRecurrenceSignature(candidate)
+  );
+  if(duplicate){
+    showToast('That intention already exists.');
     return;
   }
 
-  if(!dayLogs[key]) dayLogs[key] = { mood:'', sleep:'', note:'', tasks:[] };
-  const nonGoal = dayLogs[key].tasks.filter(t => !t._fromGoal);
-  if(nonGoal.some(t => t.text === text)){
-    showToast('This intention already exists for this day.');
-    return;
-  }
-  dayLogs[key].tasks.push({ text, checked:false, badgeColor:colorHex, badge:label||null });
+  const newIntent = {
+    id: `pi-${Date.now()}`,
+    text,
+    ...candidate
+  };
+  intentionsStore.push(newIntent);
 
-  if(selectedYear===yy && selectedMonth===mm && selectedDate===dd){
-    const list = document.getElementById('task-list');
-    if(list){
-      const item = createTaskEl(text, false, colorHex, label);
-      const goalSection = list.querySelector('.goal-linked-section');
-      if(goalSection) list.insertBefore(item, goalSection);
-      else list.appendChild(item);
-    }
-  }
-
+  getPersonalIntentionRowsForDate(yy, mm, dd, true);
+  closeIntentionAdder();
   buildCalendar();
   renderAlwaysPanel(yy, mm, dd);
-  closeIntentionAdder();
-  showToast(`✓ Added to ${new Date(yy, mm, dd).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`);
+  renderDayGlance(yy, mm, dd, getPersonalIntentionRowsForDate(yy, mm, dd, false), buildGoalLinkedIntentionRows(dayLogs[key], GOALS.filter(g => goalActiveOnDay(g, yy, mm, dd))));
+  renderRightPanelIntentions();
+
+  showToast(recurrenceToastLabel(recurrence));
 }
 
-function toggleIntention(item) {
-  item.classList.toggle('done');
-  const isDone = item.classList.contains('done');
-  item.querySelector('.intention-check').textContent = isDone ? '✓' : '';
-  const text = item.querySelector('.intention-text').textContent;
-  const found = intentionsStore.find(i => i.text === text);
-  if (found) found.done = isDone;
-  const autoChanged = applyAutoMetricForIntentionText(text, isDone, TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day);
-  syncIntentionsToCalendar();
-  if(autoChanged) rerenderGoalsKeepExpanded();
-  if (isDone) showToast('✓ Intention complete. Pattern builds.');
+function renderRightPanelIntentions(enterIntentId){
+  const list = document.getElementById('intentions-list');
+  if(!list) return;
+
+  const rows = getPersonalIntentionRowsForDate(TODAY_CAL.year, TODAY_CAL.month, TODAY_CAL.day, true)
+    .filter(r => !r.checked);
+
+  if(!rows.length){
+    list.innerHTML = `<div class="at-empty" style="padding:4px 0">All clear for today.</div>`;
+    return;
+  }
+
+  list.innerHTML = rows.map(r =>
+    `<div class="intention-item${enterIntentId===r.id ? ' is-entering' : ''}" data-intent-id="${r.id}" onclick="toggleIntention('${r.id}')"><div class="intention-check"></div><div class="intention-text">${r.text}</div></div>`
+  ).join('');
+
+  if(enterIntentId){
+    const entering = list.querySelector(`.intention-item[data-intent-id="${enterIntentId}"]`);
+    if(entering){
+      requestAnimationFrame(() => entering.classList.remove('is-entering'));
+    }
+  }
+}
+
+function updateRightPanelIntentions(intentId, nextChecked){
+  const list = document.getElementById('intentions-list');
+  if(!list || !intentId){
+    renderRightPanelIntentions();
+    return;
+  }
+
+  const pendingTimer = rightPanelIntentionRemovalTimers.get(intentId);
+  if(pendingTimer){
+    clearTimeout(pendingTimer);
+    rightPanelIntentionRemovalTimers.delete(intentId);
+  }
+
+  if(nextChecked){
+    const item = list.querySelector(`.intention-item[data-intent-id="${intentId}"]`);
+    if(item){
+      item.classList.add('done');
+      const check = item.querySelector('.intention-check');
+      if(check) check.textContent = '✓';
+      item.classList.add('is-removing');
+      const timer = setTimeout(() => {
+        rightPanelIntentionRemovalTimers.delete(intentId);
+        renderRightPanelIntentions();
+      }, 320);
+      rightPanelIntentionRemovalTimers.set(intentId, timer);
+      return;
+    }
+    renderRightPanelIntentions();
+    return;
+  }
+
+  renderRightPanelIntentions(intentId);
+}
+
+function toggleIntention(intentId) {
+  const yy = TODAY_CAL.year;
+  const mm = TODAY_CAL.month;
+  const dd = TODAY_CAL.day;
+  const key = `${yy}-${mm}-${dd}`;
+
+  const rows = getPersonalIntentionRowsForDate(yy, mm, dd, true);
+  const row = rows.find(r => r.id === intentId);
+  if(!row) return;
+
+  const next = !row.checked;
+  setPersonalIntentionChecked(intentId, yy, mm, dd, next);
+  const goalSyncChanged = syncGoalSubsFromPersonalText(row.text, next, yy, mm, dd);
+  const autoChanged = applyAutoMetricForIntentionText(row.text, next, yy, mm, dd);
+
+  buildCalendar();
+  renderCalGoalStrip();
+  if(goalSyncChanged || autoChanged) rerenderGoalsKeepExpanded();
+
+  renderAlwaysPanel(selectedYear ?? yy, selectedMonth ?? mm, selectedDate ?? dd);
+  renderDayGlance(selectedYear ?? yy, selectedMonth ?? mm, selectedDate ?? dd, getPersonalIntentionRowsForDate(selectedYear ?? yy, selectedMonth ?? mm, selectedDate ?? dd, false), buildGoalLinkedIntentionRows(dayLogs[`${selectedYear ?? yy}-${selectedMonth ?? mm}-${selectedDate ?? dd}`], GOALS.filter(g => goalActiveOnDay(g, selectedYear ?? yy, selectedMonth ?? mm, selectedDate ?? dd))));
+  updateRightPanelIntentions(intentId, next);
+
+  if(next) showToast('Intention complete. Pattern builds.');
 }
 
 const LEADERBOARD = [
@@ -924,3 +1337,4 @@ function switchView(v, el) {
 // ═══════════════════════════════════════════════════════════
 // GOAL DATA MODEL
 // ═══════════════════════════════════════════════════════════
+
